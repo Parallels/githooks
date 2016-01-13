@@ -1,0 +1,18 @@
+{
+    "restrict_branches": [{
+                "policy": "allow",
+                "type"  : "create",
+                "branch": ".*",
+                "user"  : ".*"
+            },
+            {
+                "policy": "allow",
+                "type"  : "update",
+                "branch": ".*",
+                "user"  : ".*"
+    }],
+
+    "py_indent": [],
+
+    "line_endings": []
+}
