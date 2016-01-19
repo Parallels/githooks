@@ -77,7 +77,7 @@ any path for everyone. On hook script settings see below.
 
 With this configuration file, `githooks.py` implements an example
 pre-receive hook. An example post-receive hook can be implemented with
-the following onfiguration file:
+the following configuration file:
 
 ```
 {
@@ -191,7 +191,7 @@ $ chmod -R 755 $STASH_HOME/external-hooks
 
 * Go to repository Settings -> (Workflow) Hooks. Enable and configure
 External Pre Receive and Post Receive Hooks. Set __Executable__ to
-`githooks.py` and check 'Look for hooks only in safe dir'. Put a path
+`githooks.py` and check 'Look for hooks only in safe dir'. Put the path
 to a configuration file in __Positional parameters__; `githooks.py`
 expects a path that is relative to safe-dir/conf.
 

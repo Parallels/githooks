@@ -37,7 +37,7 @@ def main():
 
     # Set up logging
     logfile = os.path.join(os.environ['STASH_HOME'], 'log', 'atlassian-stash-githooks.log')
-    logging.basicConfig(format='%(asctime)s %(levelname) [%(filename)s:%(lineno)d] %(message)s',
+    logging.basicConfig(format='%(asctime)s %(levelname)s [%(filename)s:%(lineno)d] %(message)s',
                         level=logging.DEBUG,
                         filename=logfile)
     logging.debug("Running in '%s'", os.getcwd())
