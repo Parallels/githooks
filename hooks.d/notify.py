@@ -109,6 +109,6 @@ class Hook(object):
         if mails:
             hookutil.send_mail(mails, hookconfig.send_from,
                                "%s/%s - Hook notify: Files you own were modified" % (self.proj, self.repo))
-            messages.append("Notified users %s" % ', '.join(mails.keys()))
+            # messages.append("Notified users %s" % ', '.join(mails.keys()))
 
-        return True, '\n'.join(messages)
+        return True, messages

@@ -129,10 +129,11 @@ class Hook(object):
             logging.debug("is_new_branch='%s', rule_type='%s', policy='%s', permit='%s'",
                           is_new_branch, rule_type, policy, permit)
 
-        text = ""
+        messages = []
 
         if not permit:
             rule_type = 'create' if is_new_branch else 'update'
-            text = "Error: You have no permission to %s branch '%s'" % (rule_type, branch)
+            messages.append(
+                "Error: You have no permission to %s branch '%s'" % (rule_type, branch))
 
-        return permit, text
+        return permit, messages

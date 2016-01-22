@@ -73,4 +73,4 @@ class Hook(object):
             permit = permit and permit_py_indent
             logging.debug("modfile='%s', permit='%s'", modfile, permit)
 
-        return permit, '\n'.join(messages)
+        return permit, messages

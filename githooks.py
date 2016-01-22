@@ -77,11 +77,11 @@ def main():
                 raise RuntimeError("No such hook: '%s'" % hook)
             module = __import__(hook)
             hook_obj = module.Hook(os.getcwd(), config[hook])
-            status, text = hook_obj.check(
+            status, messages = hook_obj.check(
                 branch, old_sha, new_sha, pusher)
 
-            if text:
-                print "[%s]" % branch.replace('refs/heads/', ''), text
+            for message in messages:
+                print "[%s]" % branch.replace('refs/heads/', ''), message
 
             permit = permit and status
 

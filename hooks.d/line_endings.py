@@ -74,4 +74,4 @@ class Hook(object):
                 permit = permit and permit_file
                 logging.debug("modfile='%s', permit='%s'", modfile, permit)
 
-        return permit, '\n'.join(messages)
+        return permit, messages
