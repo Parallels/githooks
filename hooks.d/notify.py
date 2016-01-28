@@ -19,7 +19,8 @@ Files are assigned via .gitattributes:
 '''
 
 import os
-import re
+import itertools
+from textwrap import wrap
 import logging
 import hookconfig
 import hookutil
@@ -41,63 +42,52 @@ class Hook(object):
         # Before the hook is run git has already created
         # a new_sha commit object
 
-        # Get the new_sha diff and parse modified files from it
         if old_sha == '0000000000000000000000000000000000000000':
             old_sha = hookutil.git_empty_tree()
-        cmd = ['git', 'diff', '-U0', old_sha, new_sha]
-        ret, diff, err = hookutil.run(cmd, self.repo_dir)
-        if ret != 0:
-            raise RuntimeError(err)
+        log = hookutil.parse_git_log(self.repo_dir, old_sha, new_sha)
 
-        diff_dict = hookutil.parse_diff(diff)
-
-        # Collect modified files per each owner
-        files = {}
-        for modfile in diff_dict:
-            owners_attr = hookutil.get_attr(
-                self.repo_dir, new_sha, modfile, 'owners')
-            if owners_attr == 'unspecified' or owners_attr == 'unset':
-                continue
-
-            for owner in owners_attr.split(','):
-                # Check if owner is a valid email address
-                # Skip if owner is pusher
-                if hookconfig.get_username(owner) == pusher:
-                    logging.warning("Pusher '%s' owns '%s', skip", pusher, modfile)
+        files = []
+        for commit in log:
+            show = hookutil.parse_git_show(self.repo_dir, commit['commit'])
+            for modfile in show:
+                owners_attr = hookutil.get_attr(self.repo_dir, new_sha, modfile['path'], 'owners')
+                if owners_attr == 'unspecified' or owners_attr == 'unset':
                     continue
+                for owner in owners_attr.split(','):
+                    if hookconfig.get_username(owner) == pusher:
+                        logging.warning("Pusher '%s' owns '%s', skip", pusher, modfile['path'])
+                        continue
 
-                if owner in files:
-                    files[owner].append(modfile)
-                else:
-                    files[owner] = [modfile]
+                    files.append({'owner':owner, 'commit':commit, 'path':modfile})
 
-        link = hookconfig.stash_server + "/projects/%s/repos/%s/commits/%s" % (self.proj, self.repo, new_sha)
-
-        for owner in files:
-            text = 'List of modified files:\n'
-            for modfile in sorted(files[owner]):
-                text += '* %s\n' % modfile
+        mails = {}
+        for owner, commits in itertools.groupby(files, key=lambda ko: ko['owner']):
+            text = '<b>Branch:</b> %s\n' % branch.replace('refs/heads/', '')
+            text += '<b>By user:</b> %s\n' % pusher
             text += '\n'
 
-            text += 'By user: %s\n' % pusher
-            text += '\n'
+            for commit, paths in itertools.groupby(commits, key=lambda kc: kc['commit']):
+                link = hookconfig.stash_server + \
+                    "/projects/%s/repos/%s/commits/%s\n" % (self.proj, self.repo, commit['commit'])
 
-            text += 'Branch: %s\n' % branch.replace('refs/heads/', '')
-            text += '\n'
+                text += 'Commit: %s (%s)\n' % (commit['commit'], "<a href=%s>View in Stash</a>" % link)
+                text += 'Author: %s %s\n' % (commit['author_name'], commit['author_email'])
+                text += 'Date: %s\n' % commit['date']
+                text += '\n'
 
-            text += 'Commit: %s\n' % new_sha
-            text += '\n'
+                text += '\t%s' % '\n\t'.join(wrap(commit['message'][:100], width=70))
+                if len(commit['message']) > 100:
+                    text += '...'
+                text += '\n\n'
 
-            text += 'View in Stash: %s' % link
+                for path in paths:
+                    text += '\t%s  %s\n' % (path['path']['status'], path['path']['path'])
 
-            logging.debug("Files in mail for '%s': %s", owner, ', '.join(files[owner]))
-            files[owner] = text
+                text += '\n\n'
 
-        if not files:
-            logging.debug("No owned files were modified in this commit (new_sha='%s')",
-                          new_sha)
+            mails[owner] = text
 
-        return files
+        return mails
 
     def check(self, branch, old_sha, new_sha, pusher):
         logging.debug("branch='%s', old_sha='%s', new_sha='%s', pusher='%s'",

@@ -17,18 +17,20 @@ import subprocess
 import tempfile
 import os
 import sys
+import re
 import logging
-import hookconfig
 
 import smtplib
 from email.MIMEMultipart import MIMEMultipart
 from email.MIMEText import MIMEText
 from email.Utils import formatdate, make_msgid
 
+import hookconfig
+
 
 def run(cmd, exec_dir=os.getcwd(), env=None):
     '''
-    Execute a command from 'exec_dir' directory.
+    Execute a command in 'exec_dir' directory.
     '''
     logging.debug("Run cmd: %s", cmd)
     proc = subprocess.Popen(cmd,
@@ -51,7 +53,7 @@ def git_empty_tree():
     cmd = ['git', 'hash-object', '-t', 'tree', obj]
     ret, obj_hash, err = run(cmd, os.getcwd())
     if ret != 0:
-        raise RuntimeError(err)
+        raise RuntimeError(cmd, err)
     return obj_hash.strip()
 
 
@@ -68,7 +70,7 @@ def get_attr(repo_dir, new_sha, filename, attr):
     cmd = ['git', 'read-tree', new_sha, '--index-output', idx_file]
     ret, _, err = run(cmd, repo_dir)
     if ret != 0:
-        raise RuntimeError(err)
+        raise RuntimeError(cmd, err)
 
     # Get the attr only from the index.
     env = os.environ.copy()
@@ -76,7 +78,7 @@ def get_attr(repo_dir, new_sha, filename, attr):
     cmd = ['git', 'check-attr', '--cached', attr, '--', filename]
     ret, out, err = run(cmd, repo_dir, env)
     if ret != 0:
-        raise RuntimeError(err)
+        raise RuntimeError(cmd, err)
 
     os.remove(idx_file)
 
@@ -89,37 +91,79 @@ def get_attr(repo_dir, new_sha, filename, attr):
     return chunks[2]
 
 
-def parse_diff(diff, extension=None):
+def parse_git_log(repo, old_sha, new_sha):
     '''
-    Parse 'git diff' output. Return a dictionary
-    of modified files and their blob SHA1s. Keys
-    are modified filenames and values their blob
-    SHA1s.
+    Parse 'git log' output. Return an array of dictionaries:
+        {
+            'commit': commit hash,
+            'author_name': commit author name,
+            'author_email': commit author email,
+            'date': commit date,
+            'message': commit message
+        }
+    for each commit.
     '''
+    git_commit_fields = ['commit', 'author_name', 'author_email', 'date', 'message']
+    git_log_format = '%x1f'.join(['%H', '%an', '%ae', '%ad', '%s']) + '%x1e'
 
-    def extension_match(filepath, extension=None):
+    cmd = ['git', 'log', '--format=' + git_log_format, "%s..%s" % (old_sha, new_sha)]
+    ret, log, err = run(cmd, repo)
+    if ret != 0:
+        raise RuntimeError(cmd, err)
+
+    log = log.strip('\n\x1e').split("\x1e")
+    log = [row.strip().split("\x1f") for row in log]
+    log = [dict(zip(git_commit_fields, row)) for row in log]
+
+    for raw in log:
+        logging.debug("Parsed row: '%s'", raw)
+
+    return log
+
+
+def parse_git_show(repo, sha, extensions=None):
+    '''
+    Parse 'git show' output. Return an arrays of dictionaries:
+        {
+            'path': path fo file,
+            'status': modified, added, deleted, renamed or copied,
+            'old_blob': old blob hash,
+            'new_blob': new blob hash
+        }
+    for each modified file.
+    '''
+    def extension_match(filepath, extensions=None):
         '''
         Check if file extension matches any of the passed.
 
         - extension: an arrays of extension strings
         '''
-        if extension is None:
+        if extensions is None:
             return True
-        return any(filepath.endswith(e) for e in extension)
+        return any(filepath.endswith(ext) for ext in extensions)
 
-    diff_dict = {}
-    path = new_blob = None
-    for line in diff.splitlines():
-        # Parse 'index sha..sha mode'
-        if line.startswith('index '):
-            new_blob = line.split(' ')[1].split('..')[1]
-        elif line.startswith('+++ b/'):
-            path = line[6:]
-            assert new_blob != None
-            assert path not in diff_dict
-            diff_dict[path] = new_blob
-    return dict([(path, blob) for (path, blob) in diff_dict.items()
-                 if extension_match(path, extension)])
+    cmd = ['git', 'show', '--raw', '--format=', sha]
+    ret, show, err = run(cmd, repo)
+    if ret != 0:
+        raise RuntimeError(cmd, err)
+
+    git_show_fields = ('old_blob', 'new_blob', 'status', 'path')
+    show_json = []
+    for line in show.splitlines():
+        # Parse git raw lines:
+        # :100755 100755 7469841... 7399137... M  githooks.py
+        match = re.match(r"^:\d+\s+\d+\s+([a-z0-9]+)\.\.\.\s+([a-z0-9]+)\.\.\.\s+([MADRC])\s+(.+)$",
+                         line)
+        if not match:
+            raise RuntimeError("Could not parse 'git show' output: '%s'" % line)
+
+        # Check if file extension matches any of the passed.
+        path = match.group(4)
+        if extension_match(path, extensions):
+            show_json.append(dict(zip(git_show_fields, match.groups())))
+            logging.debug("Parsed row: '%s'", show_json[-1])
+
+    return show_json
 
 
 def send_mail(mail_to, smtp_from, subject):

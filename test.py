@@ -38,11 +38,11 @@ import unittest
 import subprocess
 import shutil
 import os
-import time
 import multiprocessing
 import json
 import sys
 import logging
+from time import sleep
 
 sys.path.append("hooks.d")
 
@@ -143,7 +143,7 @@ class TestBase(unittest.TestCase):
         while 1:
             if not os.path.exists(request):
                 attempts = attempts + 1
-                time.sleep(0.1)
+                sleep(0.1)
             else:
                 break
 
@@ -513,15 +513,16 @@ class TestNotify(TestBase):
 
         self.assertTrue('myself@gmail.com' in owners)
         text = owners['myself@gmail.com']
-        self.assertTrue('List of modified files:\n* a.txt' in text)
-        self.assertTrue('Branch: master' in text)
+        self.assertTrue('<b>Branch:</b> master' in text)
         self.assertTrue('Commit: %s' % request[2] in text)
+        self.assertTrue('A  a.txt' in text)
 
         self.assertTrue('somebody@gmail.com' in owners)
         text = owners['somebody@gmail.com']
-        self.assertTrue('List of modified files:\n* a.txt\n* b.txt' in text)
-        self.assertTrue('Branch: master' in text)
+        self.assertTrue('<b>Branch:</b> master' in text)
         self.assertTrue('Commit: %s' % request[2] in text)
+        self.assertTrue('A  a.txt' in text)
+        self.assertTrue('A  b.txt' in text)
 
         self.write_response(0, 'success')
         git_async_result(git_call)
@@ -552,14 +553,26 @@ class TestNotify(TestBase):
         write_string('.gitattributes', '*.txt owners=%s' % hookconfig.devmail)
         git(['add', 'a.txt', 'b.txt', '.gitattributes'])
         git(['commit', '-m', 'initial commit'])
+        sleep(1)
+
+        write_string('b.txt', 'dat')
+        git(['add', 'b.txt'])
+        git(['commit', '-m', 'second commit'])
+        sleep(1)
+
+        write_string('a.txt', 'dat')
+        git(['add', 'a.txt'])
+        # Test long commit message trimming
+        mes = ' length over one hundred symbols'
+        git(['commit', '-m', 'third commit' + mes + mes+ mes])
 
         git_call = git_async(['push', '-u', 'origin', 'master'], self.repo)
         request = self.get_request()
 
         hook = notify.Hook(self.remote_repo, [])
-        _, message = hook.check(request[0], request[1], request[2], "anon")
+        _, messages = hook.check(request[0], request[1], request[2], "anon")
 
-        self.assertTrue(message == 'Notified users %s' % hookconfig.devmail)
+        self.assertTrue(messages[0] == 'Notified users %s' % hookconfig.devmail)
 
         self.write_response(0, 'success')
         git_async_result(git_call)

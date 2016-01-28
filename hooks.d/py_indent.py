@@ -34,12 +34,8 @@ class Hook(object):
         # Get the new_sha diff and parse modified files from it
         if old_sha == '0000000000000000000000000000000000000000':
             old_sha = hookutil.git_empty_tree()
-        cmd = ['git', 'diff', '-U0', old_sha, new_sha]
-        ret, diff, err = hookutil.run(cmd, self.repo_dir)
-        if ret != 0:
-            raise RuntimeError(err)
 
-        diff_dict = hookutil.parse_diff(diff, ['.py'])
+        modfiles = hookutil.parse_git_show(self.repo_dir, new_sha, ['.py'])
 
         def has_mixed_indent(file_contents):
             '''
@@ -59,18 +55,18 @@ class Hook(object):
 
         # Get the files from the repo and check indentation.
         messages = []
-        for modfile in diff_dict:
-            cmd = ['git', 'show', diff_dict[modfile]]
+        for modfile in modfiles:
+            cmd = ['git', 'show', modfile['new_blob']]
             ret, file_contents, err = hookutil.run(cmd, self.repo_dir)
             if ret != 0:
-                raise RuntimeError(err)
+                raise RuntimeError(cmd, err)
 
             permit_py_indent = not has_mixed_indent(file_contents)
             if not permit_py_indent:
                 messages.append(
-                    "Error: file '%s' has mixed indentation" % modfile)
+                    "Error: file '%s' has mixed indentation" % modfile['path'])
 
             permit = permit and permit_py_indent
-            logging.debug("modfile='%s', permit='%s'", modfile, permit)
+            logging.debug("modfile='%s', permit='%s'", modfile['path'], permit)
 
         return permit, messages

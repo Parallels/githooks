@@ -34,12 +34,8 @@ class Hook(object):
         # Get the new_sha diff and parse modified files from it
         if old_sha == '0000000000000000000000000000000000000000':
             old_sha = hookutil.git_empty_tree()
-        cmd = ['git', 'diff', '-U0', old_sha, new_sha]
-        ret, diff, err = hookutil.run(cmd, self.repo_dir)
-        if ret != 0:
-            raise RuntimeError(err)
 
-        diff_dict = hookutil.parse_diff(diff)
+        modfiles = hookutil.parse_git_show(self.repo_dir, new_sha)
 
         def has_mixed_le(file_contents):
             '''
@@ -52,26 +48,25 @@ class Hook(object):
             return False
 
         messages = []
-        for modfile in diff_dict:
+        for modfile in modfiles:
             text_attr = hookutil.get_attr(
-                self.repo_dir, new_sha, modfile, 'text')
+                self.repo_dir, new_sha, modfile['path'], 'text')
 
             # Attr 'text' enables eol normalization, so
             # the file won't have crlf when the attr is set
             if text_attr == 'unspecified':
 
-                cmd = ['git', 'show', diff_dict[modfile]]
-                ret, file_contents, err = hookutil.run(
-                    cmd, self.repo_dir, None)
+                cmd = ['git', 'show', modfile['new_blob']]
+                ret, file_contents, err = hookutil.run(cmd, self.repo_dir)
                 if ret != 0:
-                    raise RuntimeError(err)
+                    raise RuntimeError(cmd, err)
 
                 permit_file = not has_mixed_le(file_contents)
                 if not permit_file:
                     messages.append(
-                        "Error: file '%s' has mixed line endings" % modfile)
+                        "Error: file '%s' has mixed line endings" % modfile['path'])
 
                 permit = permit and permit_file
-                logging.debug("modfile='%s', permit='%s'", modfile, permit)
+                logging.debug("modfile='%s', permit='%s'", modfile['path'], permit)
 
         return permit, messages
