@@ -527,6 +527,65 @@ class TestNotify(TestBase):
         self.write_response(0, 'success')
         git_async_result(git_call)
 
+    def test_only_new_commits(self):
+        write_string('a.txt', 'data')
+        git(['add', 'a.txt'])
+        git(['commit', '-m', 'initial commit'])
+        git_call = git_async(['push', '-u', 'origin', 'master:one'], self.repo)
+        self.get_request()
+        self.write_response(0, 'success')
+        git_async_result(git_call)
+
+        write_string('b.txt', 'data')
+        git(['add', 'b.txt'])
+        git(['commit', '-m', 'second commit'])
+        git_call = git_async(['push', '-u', 'origin', 'master:two'], self.repo)
+        self.get_request()
+        self.write_response(0, 'success')
+        git_async_result(git_call)
+
+        write_string('b.txt', 'dat')
+        write_string('.gitattributes', '*.txt owners=%s' % 'somebody@gmail.com')
+        git(['add', 'b.txt', '.gitattributes'])
+        git(['commit', '-m', 'third commit'])
+        git_call = git_async(['push', '-u', 'origin', 'master'], self.repo)
+        request = self.get_request()
+
+        hook = notify.Hook(self.remote_repo, [])
+        owners = hook.compose_mail(request[0], request[1], request[2], "anon")
+
+        self.assertTrue('somebody@gmail.com' in owners)
+        self.assertTrue(len(owners) == 1)
+        text = owners['somebody@gmail.com']
+        self.assertTrue('third commit' in text)
+        self.assertTrue('M  b.txt' in text)
+        self.assertFalse('initial commit' in text)
+        self.assertFalse('second commit' in text)
+
+        self.write_response(0, 'success')
+        git_async_result(git_call)
+
+        write_string('c.txt', 'dat')
+        git(['add', 'c.txt'])
+        git(['commit', '-m', 'forth commit'])
+        git_call = git_async(['push', '-u', 'origin', 'master'], self.repo)
+        request = self.get_request()
+
+        hook = notify.Hook(self.remote_repo, [])
+        owners = hook.compose_mail(request[0], request[1], request[2], "anon")
+
+        self.assertTrue('somebody@gmail.com' in owners)
+        text = owners['somebody@gmail.com']
+        self.assertTrue('forth commit' in text)
+        self.assertTrue('A  c.txt' in text)
+        self.assertFalse('initial commit' in text)
+        self.assertFalse('second commit' in text)
+        self.assertFalse('third commit' in text)
+
+        self.write_response(0, 'success')
+        git_async_result(git_call)
+
+
     def test_bad_owner(self):
         write_string('a.txt', 'data')
         write_string('.gitattributes', 'a.txt owners=somebody@gmail.com,myself')
@@ -550,13 +609,17 @@ class TestNotify(TestBase):
 
         write_string('a.txt', 'data')
         write_string('b.txt', 'data')
-        write_string('.gitattributes', '*.txt owners=%s' % hookconfig.devmail)
-        git(['add', 'a.txt', 'b.txt', '.gitattributes'])
+        git(['add', 'a.txt', 'b.txt'])
         git(['commit', '-m', 'initial commit'])
         sleep(1)
+        git_call = git_async(['push', '-u', 'origin', 'master:another'], self.repo)
+        self.get_request()
+        self.write_response(0, 'success')
+        git_async_result(git_call)
 
         write_string('b.txt', 'dat')
-        git(['add', 'b.txt'])
+        write_string('.gitattributes', '*.txt owners=%s' % hookconfig.devmail)
+        git(['add', 'b.txt', '.gitattributes'])
         git(['commit', '-m', 'second commit'])
         sleep(1)
 

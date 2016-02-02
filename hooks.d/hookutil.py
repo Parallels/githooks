@@ -91,7 +91,7 @@ def get_attr(repo_dir, new_sha, filename, attr):
     return chunks[2]
 
 
-def parse_git_log(repo, old_sha, new_sha):
+def parse_git_log(repo, branch, old_sha, new_sha):
     '''
     Parse 'git log' output. Return an array of dictionaries:
         {
@@ -106,7 +106,27 @@ def parse_git_log(repo, old_sha, new_sha):
     git_commit_fields = ['commit', 'author_name', 'author_email', 'date', 'message']
     git_log_format = '%x1f'.join(['%H', '%an', '%ae', '%ad', '%s']) + '%x1e'
 
-    cmd = ['git', 'log', '--format=' + git_log_format, "%s..%s" % (old_sha, new_sha)]
+    cmd = ['git', 'log', '--format=' + git_log_format]
+    if old_sha == '0000000000000000000000000000000000000000':
+        # If it is a new branch, get all commits that exist only
+        # on the branch being updated, and not any others
+        # See http://stackoverflow.com/questions/5720343/
+        # First, get all refs in the repo
+        ref_cmd = ['git', 'for-each-ref', '--format=%(refname)']
+        ret, refs, err = run(ref_cmd, repo)
+        if ret != 0:
+            raise RuntimeError(ref_cmd, err)
+        refs = refs.splitlines()
+        # Remove the branch being pushed
+        if branch in refs:
+            refs.remove(branch)
+
+        cmd += ['--no-merges', new_sha]
+        if refs:
+            cmd += ['--not'] + refs
+    else:
+        cmd += ["%s..%s" % (old_sha, new_sha)]
+
     ret, log, err = run(cmd, repo)
     if ret != 0:
         raise RuntimeError(cmd, err)

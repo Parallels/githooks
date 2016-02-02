@@ -42,9 +42,7 @@ class Hook(object):
         # Before the hook is run git has already created
         # a new_sha commit object
 
-        if old_sha == '0000000000000000000000000000000000000000':
-            old_sha = hookutil.git_empty_tree()
-        log = hookutil.parse_git_log(self.repo_dir, old_sha, new_sha)
+        log = hookutil.parse_git_log(self.repo_dir, branch, old_sha, new_sha)
 
         files = []
         for commit in log:
