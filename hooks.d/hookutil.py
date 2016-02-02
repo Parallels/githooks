@@ -43,20 +43,6 @@ def run(cmd, exec_dir=os.getcwd(), env=None):
     return proc.returncode, out, err
 
 
-def git_empty_tree():
-    '''
-    Returns empty git object.
-    '''
-    obj = '/dev/null'
-    if sys.platform == 'win32':
-        obj = 'NUL'
-    cmd = ['git', 'hash-object', '-t', 'tree', obj]
-    ret, obj_hash, err = run(cmd, os.getcwd())
-    if ret != 0:
-        raise RuntimeError(cmd, err)
-    return obj_hash.strip()
-
-
 def get_attr(repo_dir, new_sha, filename, attr):
     '''
     Get git attribute 'attr' of file 'filename'.

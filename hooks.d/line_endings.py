@@ -31,10 +31,6 @@ class Hook(object):
         # Before the hook is run git has already created
         # a new_sha commit object
 
-        # Get the new_sha diff and parse modified files from it
-        if old_sha == '0000000000000000000000000000000000000000':
-            old_sha = hookutil.git_empty_tree()
-
         modfiles = hookutil.parse_git_show(self.repo_dir, new_sha)
 
         def has_mixed_le(file_contents):
