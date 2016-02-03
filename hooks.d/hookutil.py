@@ -93,7 +93,7 @@ def parse_git_log(repo, branch, old_sha, new_sha):
     git_log_format = '%x1f'.join(['%H', '%an', '%ae', '%ad', '%s']) + '%x1e'
 
     cmd = ['git', 'log', '--format=' + git_log_format]
-    if old_sha == '0000000000000000000000000000000000000000':
+    if old_sha == '0' * 40:
         # If it is a new branch, get all commits that exist only
         # on the branch being updated, and not any others
         # See http://stackoverflow.com/questions/5720343/
@@ -116,6 +116,10 @@ def parse_git_log(repo, branch, old_sha, new_sha):
     ret, log, err = run(cmd, repo)
     if ret != 0:
         raise RuntimeError(cmd, err)
+
+    if not log:
+        logging.debug("Empty git log")
+        return {}
 
     log = log.strip('\n\x1e').split("\x1e")
     log = [row.strip().split("\x1f") for row in log]
@@ -148,6 +152,7 @@ def parse_git_show(repo, sha, extensions=None):
             return True
         return any(filepath.endswith(ext) for ext in extensions)
 
+    assert sha != '0' * 40
     cmd = ['git', 'show', '--raw', '--format=', sha]
     ret, show, err = run(cmd, repo)
     if ret != 0:

@@ -585,6 +585,26 @@ class TestNotify(TestBase):
         self.write_response(0, 'success')
         git_async_result(git_call)
 
+    def test_no_new_commits(self):
+        write_string('a.txt', 'data')
+        write_string('.gitattributes', 'a.txt owners=somebody@gmail.com')
+        git(['add', 'a.txt', '.gitattributes'])
+        git(['commit', '-m', 'initial commit'])
+        git_call = git_async(['push', '-u', 'origin', 'master'], self.repo)
+        self.get_request()
+        self.write_response(0, 'success')
+        git_async_result(git_call)
+
+        git_call = git_async(['push', '-u', 'origin', 'master:one'], self.repo)
+        request = self.get_request()
+
+        hook = notify.Hook(self.remote_repo, [])
+        owners = hook.compose_mail(request[0], request[1], request[2], "anon")
+
+        self.assertTrue(owners == {})
+
+        self.write_response(0, 'success')
+        git_async_result(git_call)
 
     def test_bad_owner(self):
         write_string('a.txt', 'data')
