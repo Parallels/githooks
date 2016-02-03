@@ -653,9 +653,7 @@ class TestNotify(TestBase):
         request = self.get_request()
 
         hook = notify.Hook(self.remote_repo, [])
-        _, messages = hook.check(request[0], request[1], request[2], "anon")
-
-        self.assertTrue(messages[0] == 'Notified users %s' % hookconfig.devmail)
+        hook.check(request[0], request[1], request[2], "anon")
 
         self.write_response(0, 'success')
         git_async_result(git_call)

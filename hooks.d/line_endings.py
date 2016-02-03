@@ -28,6 +28,11 @@ class Hook(object):
                       branch, old_sha, new_sha, pusher)
         permit = True
 
+        # Do not run the hook if the branch is being deleted
+        if new_sha == '0' * 40:
+            logging.debug("Deleting the branch, skip the hook")
+            return True, []
+
         # Before the hook is run git has already created
         # a new_sha commit object
 

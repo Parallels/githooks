@@ -91,12 +91,15 @@ class Hook(object):
         logging.debug("branch='%s', old_sha='%s', new_sha='%s', pusher='%s'",
                       branch, old_sha, new_sha, pusher)
 
+        # Do not run the hook if the branch is being deleted
+        if new_sha == '0' * 40:
+            logging.debug("Deleting the branch, skip the hook")
+            return True, []
+
         mails = self.compose_mail(branch, old_sha, new_sha, pusher)
 
-        messages = []
         if mails:
             hookutil.send_mail(mails, hookconfig.send_from,
                                "%s/%s - Hook notify: Files you own were modified" % (self.proj, self.repo))
-            # messages.append("Notified users %s" % ', '.join(mails.keys()))
 
-        return True, messages
+        return True, []
