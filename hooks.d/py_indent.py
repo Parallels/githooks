@@ -57,6 +57,11 @@ class Hook(object):
         # Get the files from the repo and check indentation.
         messages = []
         for modfile in modfiles:
+            # Skip deleted files
+            if modfile['status'] == 'D':
+                logging.debug("Deleted '%s', skip", modfile['path'])
+                continue
+
             cmd = ['git', 'show', modfile['new_blob']]
             ret, file_contents, err = hookutil.run(cmd, self.repo_dir)
             if ret != 0:

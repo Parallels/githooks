@@ -50,6 +50,11 @@ class Hook(object):
 
         messages = []
         for modfile in modfiles:
+            # Skip deleted files
+            if modfile['status'] == 'D':
+                logging.debug("Deleted '%s', skip", modfile['path'])
+                continue
+
             text_attr = hookutil.get_attr(
                 self.repo_dir, new_sha, modfile['path'], 'text')
 

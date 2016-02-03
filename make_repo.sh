@@ -25,6 +25,7 @@ mkdir $cwd/tmp/remote_repo.git
 git init --bare $cwd/tmp/remote_repo.git
 
 # Set up the hooks.
+mkdir $cwd/tmp/remote_repo.git/log
 export STASH_HOME=$cwd/tmp/remote_repo.git
 export STASH_USER_NAME=$USER
 export STASH_PROJECT_KEY="LOCAL"
