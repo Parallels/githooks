@@ -32,7 +32,7 @@ def run(cmd, exec_dir=os.getcwd(), env=None):
     '''
     Execute a command in 'exec_dir' directory.
     '''
-    logging.debug("Run cmd: %s", cmd)
+    logging.debug("Run cmd: %s", cmd[:10] + [' ... (cut)'] if len(cmd) > 10 else cmd)
     proc = subprocess.Popen(cmd,
                             stdout=subprocess.PIPE,
                             stderr=subprocess.PIPE,
