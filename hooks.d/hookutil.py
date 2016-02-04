@@ -28,19 +28,26 @@ from email.Utils import formatdate, make_msgid
 import hookconfig
 
 
-def run(cmd, exec_dir=os.getcwd(), env=None):
+def run(cmd, exec_dir=os.getcwd(), env=None, check_ret=True):
     '''
     Execute a command in 'exec_dir' directory.
     '''
-    logging.debug("Run cmd: %s", cmd[:10] + [' ... (cut)'] if len(cmd) > 10 else cmd)
+    log_cmd = ' '.join(cmd[:10] + [" ... (cut %s)" % (len(cmd)-10)] if len(cmd) > 10 else cmd)
+    logging.debug("Run cmd: '%s'", log_cmd)
+
     proc = subprocess.Popen(cmd,
                             stdout=subprocess.PIPE,
                             stderr=subprocess.PIPE,
                             cwd=exec_dir,
                             env=env)
     out, err = proc.communicate()
+    ret = proc.returncode
 
-    return proc.returncode, out, err
+    if check_ret and ret != 0:
+        logging.error("Command '%s' returned non-zero exit status %s", log_cmd, ret)
+        raise subprocess.CalledProcessError(ret, log_cmd)
+
+    return ret, out, err
 
 
 def get_attr(repo_dir, new_sha, filename, attr):
@@ -54,17 +61,13 @@ def get_attr(repo_dir, new_sha, filename, attr):
 
     # Create an index from new_sha.
     cmd = ['git', 'read-tree', new_sha, '--index-output', idx_file]
-    ret, _, err = run(cmd, repo_dir)
-    if ret != 0:
-        raise RuntimeError(cmd, err)
+    run(cmd, repo_dir)
 
     # Get the attr only from the index.
     env = os.environ.copy()
     env['GIT_INDEX_FILE'] = idx_file
     cmd = ['git', 'check-attr', '--cached', attr, '--', filename]
-    ret, out, err = run(cmd, repo_dir, env)
-    if ret != 0:
-        raise RuntimeError(cmd, err)
+    _, out, _ = run(cmd, repo_dir, env)
 
     os.remove(idx_file)
 
@@ -99,9 +102,7 @@ def parse_git_log(repo, branch, old_sha, new_sha):
         # See http://stackoverflow.com/questions/5720343/
         # First, get all refs in the repo
         ref_cmd = ['git', 'for-each-ref', '--format=%(refname)']
-        ret, refs, err = run(ref_cmd, repo)
-        if ret != 0:
-            raise RuntimeError(ref_cmd, err)
+        _, refs, _ = run(ref_cmd, repo)
         refs = refs.splitlines()
         # Remove the branch being pushed
         if branch in refs:
@@ -113,9 +114,7 @@ def parse_git_log(repo, branch, old_sha, new_sha):
     else:
         cmd += ["%s..%s" % (old_sha, new_sha)]
 
-    ret, log, err = run(cmd, repo)
-    if ret != 0:
-        raise RuntimeError(cmd, err)
+    _, log, _ = run(cmd, repo)
 
     if not log:
         logging.debug("Empty git log")
@@ -154,9 +153,7 @@ def parse_git_show(repo, sha, extensions=None):
 
     assert sha != '0' * 40
     cmd = ['git', 'show', '--raw', '--format=', sha]
-    ret, show, err = run(cmd, repo)
-    if ret != 0:
-        raise RuntimeError(cmd, err)
+    _, show, _ = run(cmd, repo)
 
     git_show_fields = ('old_blob', 'new_blob', 'status', 'path')
     show_json = []
@@ -166,6 +163,7 @@ def parse_git_show(repo, sha, extensions=None):
         match = re.match(r"^:\d+\s+\d+\s+([a-z0-9]+)\.\.\.\s+([a-z0-9]+)\.\.\.\s+([MADRC])\s+(.+)$",
                          line)
         if not match:
+            logging.error("Could not parse 'git show' output: '%s'" % line)
             raise RuntimeError("Could not parse 'git show' output: '%s'" % line)
 
         # Check if file extension matches any of the passed.

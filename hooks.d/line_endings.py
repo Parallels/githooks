@@ -63,9 +63,7 @@ class Hook(object):
             if text_attr == 'unspecified':
 
                 cmd = ['git', 'show', modfile['new_blob']]
-                ret, file_contents, err = hookutil.run(cmd, self.repo_dir)
-                if ret != 0:
-                    raise RuntimeError(cmd, err)
+                _, file_contents, _ = hookutil.run(cmd, self.repo_dir)
 
                 permit_file = not has_mixed_le(file_contents)
                 if not permit_file:
