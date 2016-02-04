@@ -624,6 +624,46 @@ class TestNotify(TestBase):
         self.write_response(0, 'success')
         git_async_result(git_call)
 
+    def test_merge_commit(self):
+        write_string('a.txt', 'data')
+        git(['add', 'a.txt'])
+        git(['commit', '-m', 'initial commit'])
+
+        git_call = git_async(['push', '-u', 'origin', 'master'], self.repo)
+        self.get_request()
+        self.write_response(0, 'success')
+        git_async_result(git_call)
+
+        git(['checkout', '-b', 'hotfix'])
+        write_string('a.txt', 'newdata')
+        write_string('.gitattributes', 'b.txt owners=somebody@gmail.com')
+        git(['add', 'a.txt', '.gitattributes'])
+        git(['commit', '-m', 'hotfix'])
+
+        git(['checkout', 'master'])
+        git(['checkout', '-b', 'feature'])
+        write_string('b.txt', 'reallynewdata')
+        git(['add', 'b.txt'])
+        git(['commit', '-m', 'feature'])
+
+        git(['checkout', 'master'])
+        git(['merge', 'hotfix'])
+        git(['merge', 'feature'])
+
+        git_call = git_async(['push', '-u', 'origin', 'master'], self.repo)
+        request = self.get_request()
+        hook = notify.Hook(self.remote_repo, [])
+        owners = hook.compose_mail(request[0], request[1], request[2], "anon")
+
+        self.assertTrue('somebody@gmail.com' in owners)
+        text = owners['somebody@gmail.com']
+        self.assertTrue("Merge branch 'feature'\n\n\tA  b.txt" in text)
+        self.assertTrue("feature\n\n\tA  b.txt" in text)
+        self.assertFalse("hotfix\n\n\tM  a.txt" in text)
+
+        self.write_response(0, 'success')
+        git_async_result(git_call)
+
     def test_successful_hook(self):
         assert hookconfig.devmail != None, 'please configure devmail and send_from to run this test'
 

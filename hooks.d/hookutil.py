@@ -95,24 +95,28 @@ def parse_git_log(repo, branch, old_sha, new_sha):
     git_commit_fields = ['commit', 'author_name', 'author_email', 'date', 'message']
     git_log_format = '%x1f'.join(['%H', '%an', '%ae', '%ad', '%s']) + '%x1e'
 
+    # Get all commits that exist only on the branch
+    # being updated, and not any others
+    # See http://stackoverflow.com/questions/5720343/
+
+    # Get all refs in the repo
+    _, refs, _ = run(['git', 'for-each-ref', '--format=%(refname)'], repo)
+    refs = refs.splitlines()
+    # Remove the branch being pushed
+    if branch in refs:
+        refs.remove(branch)
+
     cmd = ['git', 'log', '--format=' + git_log_format]
     if old_sha == '0' * 40:
-        # If it is a new branch, get all commits that exist only
-        # on the branch being updated, and not any others
-        # See http://stackoverflow.com/questions/5720343/
-        # First, get all refs in the repo
-        ref_cmd = ['git', 'for-each-ref', '--format=%(refname)']
-        _, refs, _ = run(ref_cmd, repo)
-        refs = refs.splitlines()
-        # Remove the branch being pushed
-        if branch in refs:
-            refs.remove(branch)
-
-        cmd += ['--no-merges', new_sha]
-        if refs:
-            cmd += ['--not'] + refs
+        # It's a new branch
+        cmd += [new_sha]
     else:
+        # It's an old branch, look only in this range
         cmd += ["%s..%s" % (old_sha, new_sha)]
+
+    # Exclude commits that exist in the repo
+    if refs:
+        cmd += ['--not'] + refs
 
     _, log, _ = run(cmd, repo)
 
@@ -152,7 +156,7 @@ def parse_git_show(repo, sha, extensions=None):
         return any(filepath.endswith(ext) for ext in extensions)
 
     assert sha != '0' * 40
-    cmd = ['git', 'show', '--raw', '--format=', sha]
+    cmd = ['git', 'show', '-m', '--raw', '--no-abbrev', '--format=', sha]
     _, show, _ = run(cmd, repo)
 
     git_show_fields = ('old_blob', 'new_blob', 'status', 'path')
@@ -160,7 +164,7 @@ def parse_git_show(repo, sha, extensions=None):
     for line in show.splitlines():
         # Parse git raw lines:
         # :100755 100755 7469841... 7399137... M  githooks.py
-        match = re.match(r"^:\d+\s+\d+\s+([a-z0-9]+)\.\.\.\s+([a-z0-9]+)\.\.\.\s+([MADRC])\s+(.+)$",
+        match = re.match(r"^:\d{6}\s\d{6}\s([a-z0-9]{40})\s([a-z0-9]{40})\s([MAD])\s+(\S+)$",
                          line)
         if not match:
             logging.error("Could not parse 'git show' output: '%s'" % line)
