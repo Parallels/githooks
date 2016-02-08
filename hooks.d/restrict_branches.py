@@ -61,10 +61,7 @@ class Hook(object):
 
         # Check if the branch being pushed is new
         is_new_branch = False
-        cmd = ['git', 'rev-parse', branch]
-        ret, _, _ = hookutil.run(cmd, self.repo_dir, check_ret=False)
-
-        if ret != 0:
+        if old_sha == '0' * 40:
             is_new_branch = True
 
         branch = branch.replace('refs/heads/', '')
