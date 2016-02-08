@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 # Example githooks configuration file
+import os
 
 #
 # githooks developer email
@@ -9,9 +10,16 @@
 devmail = None
 
 #
-# Stash server
+# Stash and external-hooks environment
 #
-stash_server = 'https://STASH'
+stash_server = os.environ['STASH_BASE_URL']
+# githooks root directory
+safe_dir = os.path.join(os.environ['STASH_HOME'], 'external-hooks')
+# githooks configuration files
+config_dir = os.path.join(safe_dir, 'conf')
+
+logfile = os.path.join(os.environ['STASH_HOME'], 'log', 'atlassian-stash-githooks.log')
+pusher = os.environ['STASH_USER_NAME']
 
 #
 # SMTP relay settings

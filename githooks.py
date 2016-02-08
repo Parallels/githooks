@@ -26,44 +26,27 @@ import json
 import fileinput
 import logging
 
+encoding = sys.getfilesystemencoding()
+this_file_path = os.path.dirname(unicode(__file__, encoding))
+hooks_dir = os.path.join(this_file_path, 'hooks.d')
+sys.path.append(hooks_dir)
+import hookconfig
+
 
 def main():
-    try:
-        assert('STASH_HOME' in os.environ)
-    except:
-        logging.error('STASH_HOME not set')
-        raise RuntimeError('STASH_HOME not set')
-    base_path = os.path.join(os.environ['STASH_HOME'], 'external-hooks')
-
     # Set up logging
-    logfile = os.path.join(os.environ['STASH_HOME'], 'log', 'atlassian-stash-githooks.log')
     logging.basicConfig(format='%(asctime)s %(levelname)s [%(filename)s:%(lineno)d] %(message)s',
                         level=logging.DEBUG,
-                        filename=logfile)
+                        filename=hookconfig.logfile)
     logging.debug("Running in '%s'", os.getcwd())
 
-    encoding = sys.getfilesystemencoding()
-    this_file_path = os.path.dirname(unicode(__file__, encoding))
-
-    config = sys.argv[1]
+    config_path = os.path.join(hookconfig.config_dir, sys.argv[1])
     remainder = sys.argv[2:]
 
     # Look for config files only in safe-dir
-    # (STASH_HOME/external-hooks/conf/)
-    config_path = os.path.join(base_path, 'conf', config)
     with open(config_path) as f:
         config = json.loads(f.read())
-    logging.debug("Loaded config from '%s'", config_path)
-
-    try:
-        assert('STASH_USER_NAME' in os.environ)
-        pusher = os.environ['STASH_USER_NAME']
-    except:
-        logging.error('STASH_USER_NAME not set')
-        raise RuntimeError('STASH_USER_NAME not set')
-
-    hooks_dir = os.path.join(this_file_path, 'hooks.d')
-    sys.path.append(hooks_dir)
+    logging.debug("Loaded config '%s'", config_path)
 
     permit = True
 
@@ -78,7 +61,7 @@ def main():
             module = __import__(hook)
             hook_obj = module.Hook(os.getcwd(), config[hook])
             status, messages = hook_obj.check(
-                branch, old_sha, new_sha, pusher)
+                branch, old_sha, new_sha, hookconfig.pusher)
 
             for message in messages:
                 print "[%s]" % branch.replace('refs/heads/', ''), message
