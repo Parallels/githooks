@@ -164,11 +164,11 @@ def parse_git_show(repo, sha, extensions=None):
     for line in show.splitlines():
         # Parse git raw lines:
         # :100755 100755 7469841... 7399137... M  githooks.py
-        match = re.match(r"^:\d{6}\s\d{6}\s([a-z0-9]{40})\s([a-z0-9]{40})\s([MAD])\s+(\S+)$",
+        match = re.match(r"^:\d{6}\s\d{6}\s([a-z0-9]{40})\s([a-z0-9]{40})\s([MAD])\s+(.+)$",
                          line)
         if not match:
             logging.error("Could not parse 'git show' output: '%s'" % line)
-            raise RuntimeError("Could not parse 'git show' output: '%s'" % line)
+            continue
 
         # Check if file extension matches any of the passed.
         path = match.group(4)
