@@ -156,7 +156,7 @@ def parse_git_show(repo, sha, extensions=None):
         return any(filepath.endswith(ext) for ext in extensions)
 
     assert sha != '0' * 40
-    cmd = ['git', 'show', '-m', '--raw', '--no-abbrev', '--format=', sha]
+    cmd = ['git', 'show', '--first-parent', '--raw', '--no-abbrev', '--format=', sha]
     _, show, _ = run(cmd, repo)
 
     git_show_fields = ('old_blob', 'new_blob', 'status', 'path')
