@@ -36,41 +36,44 @@ class Hook(object):
         # Before the hook is run git has already created
         # a new_sha commit object
 
-        modfiles = hookutil.parse_git_show(self.repo_dir, new_sha, ['.py'])
+        log = hookutil.parse_git_log(self.repo_dir, branch, old_sha, new_sha)
 
-        def has_mixed_indent(file_contents):
-            '''
-            Check if file lines start with tabs and spaces
-            file_contents = open(file).read()
-            '''
-            has_tab = False
-            has_space = False
-            for line in file_contents.split('\n'):
-                if line.startswith('\t'):
-                    has_tab = True
-                elif line.startswith(' '):
-                    has_space = True
-                if has_tab and has_space:
-                    return True
-            return False
-
-        # Get the files from the repo and check indentation.
         messages = []
-        for modfile in modfiles:
-            # Skip deleted files
-            if modfile['status'] == 'D':
-                logging.debug("Deleted '%s', skip", modfile['path'])
-                continue
+        for commit in log:
+            modfiles = hookutil.parse_git_show(self.repo_dir, commit['commit'], ['.py'])
 
-            cmd = ['git', 'show', modfile['new_blob']]
-            _, file_contents, _ = hookutil.run(cmd, self.repo_dir)
+            def has_mixed_indent(file_contents):
+                '''
+                Check if file lines start with tabs and spaces
+                file_contents = open(file).read()
+                '''
+                has_tab = False
+                has_space = False
+                for line in file_contents.split('\n'):
+                    if line.startswith('\t'):
+                        has_tab = True
+                    elif line.startswith(' '):
+                        has_space = True
+                    if has_tab and has_space:
+                        return True
+                return False
 
-            permit_py_indent = not has_mixed_indent(file_contents)
-            if not permit_py_indent:
-                messages.append(
-                    "Error: file '%s' has mixed indentation" % modfile['path'])
+            # Get the files from the repo and check indentation.
+            for modfile in modfiles:
+                # Skip deleted files
+                if modfile['status'] == 'D':
+                    logging.debug("Deleted '%s', skip", modfile['path'])
+                    continue
 
-            permit = permit and permit_py_indent
-            logging.debug("modfile='%s', permit='%s'", modfile['path'], permit)
+                cmd = ['git', 'show', modfile['new_blob']]
+                _, file_contents, _ = hookutil.run(cmd, self.repo_dir)
+
+                permit_py_indent = not has_mixed_indent(file_contents)
+                if not permit_py_indent:
+                    messages.append({'at': commit['commit'],
+                        'text': "Error: file '%s' has mixed indentation" % modfile['path']})
+
+                permit = permit and permit_py_indent
+                logging.debug("modfile='%s', permit='%s'", modfile['path'], permit)
 
         return permit, messages

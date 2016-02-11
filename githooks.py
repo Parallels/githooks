@@ -33,7 +33,20 @@ sys.path.append(hooks_dir)
 import hookconfig
 
 
-def main():
+def load_hooks(config, repo=os.getcwd()):
+    hooks = []
+    for hook in config:
+        try:
+            module = __import__(hook)
+            hooks.append(module.Hook(repo, config[hook]))
+        except ImportError as err:
+            message = "Could not load hook: '%s' (%s)" % (hook, str(err))
+            logging.error(message)
+            raise RuntimeError(message)
+    return hooks
+
+
+if __name__ == '__main__':
     # Set up logging
     logging.basicConfig(format='%(asctime)s %(levelname)s [%(filename)s:%(lineno)d] %(message)s',
                         level=logging.DEBUG,
@@ -48,23 +61,20 @@ def main():
         config = json.loads(f.read())
     logging.debug("Loaded config '%s'", config_path)
 
+    hooks = load_hooks(config)
+
     permit = True
 
     # Read in each ref that the user is trying to update.
     for line in fileinput.input(remainder):
         old_sha, new_sha, branch = line.strip().split(' ')
 
-        for hook in config:
-            if not os.path.exists(os.path.join(hooks_dir, hook + '.py')):
-                logging.error("No such hook: '%s'", hook)
-                raise RuntimeError("No such hook: '%s'" % hook)
-            module = __import__(hook)
-            hook_obj = module.Hook(os.getcwd(), config[hook])
-            status, messages = hook_obj.check(
+        for hook in hooks:
+            status, messages = hook.check(
                 branch, old_sha, new_sha, hookconfig.pusher)
 
             for message in messages:
-                print "[%s]" % branch.replace('refs/heads/', ''), message
+                print "[%s @ %s]: %s" % (branch, message['at'], message['text'])
 
             permit = permit and status
 
@@ -72,7 +82,3 @@ def main():
         sys.exit(1)
 
     sys.exit(0)
-
-
-if __name__ == '__main__':
-    main()

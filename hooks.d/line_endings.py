@@ -36,39 +36,43 @@ class Hook(object):
         # Before the hook is run git has already created
         # a new_sha commit object
 
-        modfiles = hookutil.parse_git_show(self.repo_dir, new_sha)
-
-        def has_mixed_le(file_contents):
-            '''
-            Check if file contains both lf and crlf
-            file_contents = open(file).read()
-            '''
-            if ('\r\n' in file_contents and
-                    '\n' in file_contents.replace('\r\n', '')):
-                return True
-            return False
+        log = hookutil.parse_git_log(self.repo_dir, branch, old_sha, new_sha)
 
         messages = []
-        for modfile in modfiles:
-            # Skip deleted files
-            if modfile['status'] == 'D':
-                logging.debug("Deleted '%s', skip", modfile['path'])
-                continue
+        for commit in log:
+            modfiles = hookutil.parse_git_show(self.repo_dir, commit['commit'])
 
-            text_attr = hookutil.get_attr(
-                self.repo_dir, new_sha, modfile['path'], 'text')
+            def has_mixed_le(file_contents):
+                '''
+                Check if file contains both lf and crlf
+                file_contents = open(file).read()
+                '''
+                if ('\r\n' in file_contents and
+                        '\n' in file_contents.replace('\r\n', '')):
+                    return True
+                return False
 
-            # Attr 'text' enables eol normalization, so
-            # the file won't have crlf when the attr is set
-            if text_attr == 'unspecified':
+            for modfile in modfiles:
+                # Skip deleted files
+                if modfile['status'] == 'D':
+                    logging.debug("Deleted '%s', skip", modfile['path'])
+                    continue
 
-                cmd = ['git', 'show', modfile['new_blob']]
-                _, file_contents, _ = hookutil.run(cmd, self.repo_dir)
+                text_attr = hookutil.get_attr(
+                    self.repo_dir, new_sha, modfile['path'], 'text')
 
-                permit_file = not has_mixed_le(file_contents)
-                if not permit_file:
-                    messages.append(
-                        "Error: file '%s' has mixed line endings" % modfile['path'])
+                # Attr 'text' enables eol normalization, so
+                # the file won't have crlf when the attr is set
+                if text_attr == 'unspecified':
+
+                    # TODO assert it's of blob type
+                    cmd = ['git', 'show', modfile['new_blob']]
+                    _, file_contents, _ = hookutil.run(cmd, self.repo_dir)
+
+                    permit_file = not has_mixed_le(file_contents)
+                    if not permit_file:
+                        messages.append({'at': commit['commit'],
+                            'text': "Error: file '%s' has mixed line endings (CRLF/LF)" % modfile['path']})
 
                 permit = permit and permit_file
                 logging.debug("modfile='%s', permit='%s'", modfile['path'], permit)

@@ -16,7 +16,6 @@ hookutil: Hook utilities
 import subprocess
 import tempfile
 import os
-import sys
 import re
 import logging
 
@@ -80,6 +79,25 @@ def get_attr(repo_dir, new_sha, filename, attr):
     return chunks[2]
 
 
+class Memoized(object):
+    '''
+    Decorator. Caches a function's return value each time it is called.
+    If called later with the same arguments, the cached value is returned
+    (not reevaluated).
+    '''
+    def __init__(self, function):
+        self.function = function
+        self.memoized = {}
+    def __call__(self, *args):
+        try:
+            return self.memoized[args]
+        except KeyError:
+            logging.debug("Memoize %s %s", self.function, args)
+            self.memoized[args] = self.function(*args)
+            return self.memoized[args]
+
+
+@Memoized
 def parse_git_log(repo, branch, old_sha, new_sha):
     '''
     Parse 'git log' output. Return an array of dictionaries:

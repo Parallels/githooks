@@ -130,7 +130,7 @@ class Hook(object):
 
         if not permit:
             rule_type = 'create' if is_new_branch else 'update'
-            messages.append(
-                "Error: You have no permission to %s branch '%s'" % (rule_type, branch))
+            messages.append({'at': new_sha,
+                'text': "Error: You have no permission to %s %s" % (rule_type, branch)})
 
         return permit, messages

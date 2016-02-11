@@ -448,15 +448,25 @@ class TestLineEndings(TestBase):
         git(['config', 'core.autocrlf', 'false'])
         write_string('a.txt', 'data\r\n\n')
         write_string('b.txt', 'data\r\n\n')
+        write_string('c.txt', 'data\r\n\n')
         # git will normalize eols when attr 'text' is set
         write_string('.gitattributes', 'a.txt text')
         git(['add', 'a.txt', 'b.txt', '.gitattributes'])
         git(['commit', '-m', 'initial commit'])
+        git(['add', 'c.txt'])
+        git(['commit', '-m', 'second commit'])
+
         git_call = git_async(['push', '-u', 'origin', 'master'], self.repo)
         request = self.get_request()
 
         hook = line_endings.Hook(self.remote_repo, [])
-        self.assertFalse(hook.check(request[0], request[1], request[2], "myself")[0])
+        permit, messages = hook.check(request[0], request[1], request[2], "myself")
+        self.assertFalse(permit)
+        self.assertTrue(len(messages) == 2)
+        self.assertTrue([message['text'] for message in messages] == [
+            "Error: file 'c.txt' has mixed line endings (CRLF/LF)",
+            "Error: file 'b.txt' has mixed line endings (CRLF/LF)"
+        ])
 
         self.write_response(0, 'success')
         git_async_result(git_call)
@@ -482,15 +492,24 @@ class TestPyIndent(TestBase):
 
     def test_failed_hook(self):
         write_string('a.py', 'def main():\n  print\n\treturn 0\n')
-
+        write_string('b.py', 'def main():\n  print\n\treturn 0\n')
+        write_string('a.txt', 'def main():\n  print\n\treturn 0\n')
         git(['add', 'a.py'])
         git(['commit', '-m', 'initial commit'])
+        git(['add', 'b.py', 'a.txt'])
+        git(['commit', '-m', 'second commit'])
 
         git_call = git_async(['push', '-u', 'origin', 'master'], self.repo)
         request = self.get_request()
 
         hook = py_indent.Hook(self.remote_repo, [])
-        self.assertFalse(hook.check(request[0], request[1], request[2], "myself")[0])
+        permit, messages = hook.check(request[0], request[1], request[2], "myself")
+        self.assertFalse(permit)
+        self.assertTrue(len(messages) == 2)
+        self.assertTrue([message['text'] for message in messages] == [
+            "Error: file 'b.py' has mixed indentation",
+            "Error: file 'a.py' has mixed indentation"
+        ])
 
         self.write_response(0, 'success')
         git_async_result(git_call)
