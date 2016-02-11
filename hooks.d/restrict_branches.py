@@ -64,8 +64,6 @@ class Hook(object):
         if old_sha == '0' * 40:
             is_new_branch = True
 
-        branch = branch.replace('refs/heads/', '')
-
         for rule in self.settings:
             # Check policy
             if 'policy' not in rule:
