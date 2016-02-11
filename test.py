@@ -706,7 +706,7 @@ class TestNotify(TestBase):
         git(['add', 'a.txt'])
         # Test long commit message trimming
         mes = ' length over one hundred symbols'
-        git(['commit', '-m', 'third commit' + mes + mes+ mes])
+        git(['commit', '-m', 'third commit' + mes + mes + mes])
 
         git_call = git_async(['push', '-u', 'origin', 'master'], self.repo)
         request = self.get_request()

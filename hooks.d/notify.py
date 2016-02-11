@@ -19,6 +19,7 @@ Files are assigned via .gitattributes:
 '''
 
 import os
+import re
 import itertools
 from textwrap import wrap
 import logging
@@ -96,10 +97,22 @@ class Hook(object):
             logging.debug("Deleting the branch, skip the hook")
             return True, []
 
-        mails = self.compose_mail(branch, old_sha, new_sha, pusher)
+        # Check if branch matches any of the whitelist
+        for branch_re in self.settings:
+            try:
+                branch_rec = re.compile(branch_re)
+            except re.error:
+                logging.warning("Branch regexp '%s' does not compile, skip", branch_re)
+                continue
 
-        if mails:
-            hookutil.send_mail(mails, hookconfig.send_from,
-                               "%s/%s - Hook notify: Files you own were modified" % (self.proj, self.repo))
+            if branch_rec.match(branch):
+                logging.debug("Matched '%s'", branch_re)
+                mails = self.compose_mail(branch, old_sha, new_sha, pusher)
+                hookutil.send_mail(mails, hookconfig.send_from,
+                    "%s/%s - Hook notify: Files you subscribed to were modified" % (self.proj, self.repo))
+
+                return True, []
+
+        logging.debug("Branch '%s' does not match any of '%s', skip", branch, ' | '.join(self.settings))
 
         return True, []

@@ -1,3 +1,6 @@
 {
-  "notify": []
+    "notify": [
+        "refs/heads/master",
+        "refs/heads/release/.*"
+    ]
 }
