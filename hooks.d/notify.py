@@ -29,17 +29,17 @@ import hookutil
 
 class Hook(object):
 
-    def __init__(self, repo_dir, settings):
+    def __init__(self, repo_dir, settings, params):
         self.repo_dir = repo_dir
         self.settings = settings
-        try:
-            self.repo = os.environ['STASH_REPO_NAME']
-            self.proj = os.environ['STASH_PROJECT_KEY']
-        except KeyError as key:
-            logging.error("%s not in env", key)
-            raise RuntimeError("%s not in env" % key)
+        self.params = params
 
-    def compose_mail(self, branch, old_sha, new_sha, pusher):
+    def compose_mail(self, branch, old_sha, new_sha):
+        pusher = self.params['user_name']
+        base_url = self.params['base_url']
+        proj_key = self.params['proj_key']
+        repo_name = self.params['repo_name']
+
         # Before the hook is run git has already created
         # a new_sha commit object
 
@@ -53,10 +53,6 @@ class Hook(object):
                 if owners_attr == 'unspecified' or owners_attr == 'unset':
                     continue
                 for owner in owners_attr.split(','):
-                    if hookconfig.get_username(owner) == pusher:
-                        logging.warning("Pusher '%s' owns '%s', skip", pusher, modfile['path'])
-                        continue
-
                     files.append({'owner':owner, 'commit':commit, 'path':modfile})
 
         mails = {}
@@ -66,8 +62,8 @@ class Hook(object):
             text += '\n'
 
             for commit, paths in itertools.groupby(commits, key=lambda kc: kc['commit']):
-                link = hookconfig.stash_server + \
-                    "/projects/%s/repos/%s/commits/%s\n" % (self.proj, self.repo, commit['commit'])
+                link = base_url + \
+                    "/projects/%s/repos/%s/commits/%s\n" % (proj_key, repo_name, commit['commit'])
 
                 text += 'Commit: %s (%s)\n' % (commit['commit'], "<a href=%s>View in Stash</a>" % link)
                 text += 'Author: %s %s\n' % (commit['author_name'], commit['author_email'])
@@ -88,9 +84,16 @@ class Hook(object):
 
         return mails
 
-    def check(self, branch, old_sha, new_sha, pusher):
-        logging.debug("branch='%s', old_sha='%s', new_sha='%s', pusher='%s'",
-                      branch, old_sha, new_sha, pusher)
+    def check(self, branch, old_sha, new_sha):
+        logging.debug("branch='%s', old_sha='%s', new_sha='%s', params='%s'",
+                      branch, old_sha, new_sha, self.params)
+
+        pusher = self.params['user_name']
+        proj_key = self.params['proj_key']
+        repo_name = self.params['repo_name']
+        smtp_server = hookconfig.smtp_server
+        smtp_port = hookconfig.smtp_port
+        smtp_from = hookconfig.smtp_from
 
         # Do not run the hook if the branch is being deleted
         if new_sha == '0' * 40:
@@ -107,9 +110,10 @@ class Hook(object):
 
             if branch_rec.match(branch):
                 logging.debug("Matched '%s'", branch_re)
-                mails = self.compose_mail(branch, old_sha, new_sha, pusher)
-                hookutil.send_mail(mails, hookconfig.send_from,
-                    "%s/%s - Hook notify: Files you subscribed to were modified" % (self.proj, self.repo))
+                mails = self.compose_mail(branch, old_sha, new_sha)
+                hookutil.send_mail(mails, smtp_from,
+                    "%s/%s - Hook notify: Files you subscribed to were modified" % (proj_key, repo_name),
+                    smtp_server, smtp_port)
 
                 return True, []
 

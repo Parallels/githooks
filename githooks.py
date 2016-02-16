@@ -30,15 +30,36 @@ encoding = sys.getfilesystemencoding()
 this_file_path = os.path.dirname(unicode(__file__, encoding))
 hooks_dir = os.path.join(this_file_path, 'hooks.d')
 sys.path.append(hooks_dir)
-import hookconfig
 
 
-def load_hooks(config, repo=os.getcwd()):
+def configure_defaults():
+    '''
+    Validate Stash and external-hooks plugin environment required
+    to run the hooks. Configure default githooks source layout.
+    '''
+    params = {}
+    try:
+        params['stash_home'] = os.environ['STASH_HOME']
+        params['user_name'] = os.environ['STASH_USER_NAME']
+        params['base_url'] = os.environ['STASH_BASE_URL']
+        params['proj_key'] = os.environ['STASH_PROJECT_KEY']
+        params['repo_name'] = os.environ['STASH_REPO_NAME']
+    except KeyError as key:
+        raise RuntimeError("%s not in env" % key)
+
+    params['log_file'] = os.path.join(params['stash_home'], 'log', 'atlassian-stash-githooks.log')
+    params['root_dir'] = os.path.join(params['stash_home'], 'external-hooks')
+    params['conf_dir'] = os.path.join(params['root_dir'], 'conf')
+    params['hooks_dir'] = os.path.join(params['root_dir'], 'hooks.d')
+
+    return params
+
+def load_hooks(config, params, repo=os.getcwd()):
     hooks = []
     for hook in config:
         try:
             module = __import__(hook)
-            hooks.append(module.Hook(repo, config[hook]))
+            hooks.append(module.Hook(repo, config[hook], params))
         except ImportError as err:
             message = "Could not load hook: '%s' (%s)" % (hook, str(err))
             logging.error(message)
@@ -47,21 +68,23 @@ def load_hooks(config, repo=os.getcwd()):
 
 
 if __name__ == '__main__':
+    params = configure_defaults()
+
     # Set up logging
     logging.basicConfig(format='%(asctime)s %(levelname)s [%(filename)s:%(lineno)d] %(message)s',
                         level=logging.DEBUG,
-                        filename=hookconfig.logfile)
-    logging.debug("Running in '%s'", os.getcwd())
+                        filename=params['log_file'])
+    logging.debug("In '%s'", os.getcwd())
 
-    config_path = os.path.join(hookconfig.config_dir, sys.argv[1])
+    conf_path = os.path.join(params['conf_dir'], sys.argv[1])
     remainder = sys.argv[2:]
 
     # Look for config files only in safe-dir
-    with open(config_path) as f:
-        config = json.loads(f.read())
-    logging.debug("Loaded config '%s'", config_path)
+    with open(conf_path) as f:
+        conf = json.loads(f.read())
+    logging.debug("Loaded: '%s'", conf_path)
 
-    hooks = load_hooks(config)
+    hooks = load_hooks(conf, params)
 
     permit = True
 
@@ -70,8 +93,7 @@ if __name__ == '__main__':
         old_sha, new_sha, branch = line.strip().split(' ')
 
         for hook in hooks:
-            status, messages = hook.check(
-                branch, old_sha, new_sha, hookconfig.pusher)
+            status, messages = hook.check(branch, old_sha, new_sha)
 
             for message in messages:
                 print "[%s @ %s]: %s" % (branch, message['at'], message['text'])

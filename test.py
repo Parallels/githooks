@@ -53,6 +53,7 @@ import restrict_branches
 import line_endings
 import py_indent
 import notify
+import githooks
 
 def git(cmd, repo=None):
     if repo:
@@ -101,21 +102,26 @@ class TestBase(unittest.TestCase):
                             filename=self.logfile)
 
         self.cleanUp()
+        os.mkdir(self.base)
 
         self.remote_repo = os.path.join(self.base, 'remote_repo.git')
         self.repo = os.path.join(self.base, 'repo')
 
-        os.mkdir(self.base)
+        os.environ['STASH_HOME'] = os.path.join(self.base, 'stash')
+        os.environ['STASH_USER_NAME'] = os.environ['USER']
+        os.environ['STASH_BASE_URL'] = 'https://STASH'
+        os.environ['STASH_PROJECT_KEY'] = 'TEST'
+        os.environ['STASH_REPO_NAME'] = 'unittest'
 
+        self.params = githooks.configure_defaults()
+
+        # Set up repositories
         self.__setup_remote_repo()
         self.__setup_local_repo()
         self.__add_remote_repo()
 
         self.hook_request = os.path.join(self.base, 'request.json')
         self.hook_response = os.path.join(self.base, 'response.json')
-
-        os.environ['STASH_REPO_NAME'] = 'unittest'
-        os.environ['STASH_PROJECT_KEY'] = 'TEST'
 
         os.chdir(self.repo)
 
@@ -221,8 +227,8 @@ class TestRestrictBranches(TestBase):
             "branch": ".*",
             "user"  : ".*"
         }]
-        hook = restrict_branches.Hook(self.remote_repo, settings)
-        self.assertFalse(hook.check(request[0], request[1], request[2], "myself")[0])
+        hook = restrict_branches.Hook(self.remote_repo, settings, self.params)
+        self.assertFalse(hook.check(request[0], request[1], request[2])[0])
 
         # Let git push continue
         self.write_response(0, 'success')
@@ -236,7 +242,7 @@ class TestRestrictBranches(TestBase):
         git_call = git_async(['push', '-u', 'origin', 'master'], self.repo)
         request = self.get_request()
 
-        self.assertTrue(hook.check(request[0], request[1], request[2], "myself")[0])
+        self.assertTrue(hook.check(request[0], request[1], request[2])[0])
 
         self.write_response(0, 'success')
         git_async_result(git_call)
@@ -265,8 +271,8 @@ class TestRestrictBranches(TestBase):
             "branch": ".*",
             "user"  : ".*"
         }]
-        hook = restrict_branches.Hook(self.remote_repo, settings)
-        self.assertTrue(hook.check(request[0], request[1], request[2], "myself")[0])
+        hook = restrict_branches.Hook(self.remote_repo, settings, self.params)
+        self.assertTrue(hook.check(request[0], request[1], request[2])[0])
 
         # Let git push continue
         self.write_response(0, 'success')
@@ -280,7 +286,7 @@ class TestRestrictBranches(TestBase):
         git_call = git_async(['push', '-u', 'origin', 'master'], self.repo)
         request = self.get_request()
 
-        self.assertFalse(hook.check(request[0], request[1], request[2], "myself")[0])
+        self.assertFalse(hook.check(request[0], request[1], request[2])[0])
 
         self.write_response(0, 'success')
         git_async_result(git_call)
@@ -306,17 +312,17 @@ class TestRestrictBranches(TestBase):
         {
             "policy": "allow",
             "type"  : "create",
-            "branch": "feature/.*",
+            "branch": "refs/heads/feature/.*",
             "user"  : ".*"
         },
         {
             "policy": "allow",
             "type"  : "create",
-            "branch": "bugfix/.*",
+            "branch": "refs/heads/bugfix/.*",
             "user"  : ".*"
         }]
-        hook = restrict_branches.Hook(self.remote_repo, settings)
-        self.assertFalse(hook.check(request[0], request[1], request[2], "myself")[0])
+        hook = restrict_branches.Hook(self.remote_repo, settings, self.params)
+        self.assertFalse(hook.check(request[0], request[1], request[2])[0])
 
         # Let git push continue
         self.write_response(0, 'success')
@@ -325,7 +331,7 @@ class TestRestrictBranches(TestBase):
         # Try to create branch 'bugfix/branch'
         git_call = git_async(['push', '-u', 'origin', 'master:bugfix/branch'], self.repo)
         request = self.get_request()
-        self.assertTrue(hook.check(request[0], request[1], request[2], "myself")[0])
+        self.assertTrue(hook.check(request[0], request[1], request[2])[0])
         self.write_response(0, 'success')
         git_async_result(git_call)
 
@@ -345,29 +351,29 @@ class TestRestrictBranches(TestBase):
         settings = [{
             "policy": "deny",
             "type"  : "create",
-            "branch": "release/.*",
+            "branch": "refs/heads/release/.*",
             "user"  : ".*"
         },
         {
             "policy": "deny",
             "type"  : "update",
-            "branch": "release/.*",
+            "branch": "refs/heads/release/.*",
             "user"  : ".*"
         },
         {
             "policy": "allow",
             "type"  : "create",
-            "branch": "release/.*",
+            "branch": "refs/heads/release/.*",
             "user"  : "mary"
         },
         {
             "policy": "allow",
             "type"  : "update",
-            "branch": "release/.*",
+            "branch": "refs/heads/release/.*",
             "user"  : "(john|mary)"
         }]
-        hook = restrict_branches.Hook(self.remote_repo, settings)
-        self.assertFalse(hook.check(request[0], request[1], request[2], "myself")[0])
+        hook = restrict_branches.Hook(self.remote_repo, settings, self.params)
+        self.assertFalse(hook.check(request[0], request[1], request[2])[0])
 
         # Let git push continue
         self.write_response(0, 'success')
@@ -376,7 +382,8 @@ class TestRestrictBranches(TestBase):
         # Now mary tries to create branch 'release/another'
         git_call = git_async(['push', '-u', 'origin', 'master:release/another'], self.repo)
         request = self.get_request()
-        self.assertTrue(hook.check(request[0], request[1], request[2], "mary")[0])
+        hook.params['user_name'] = "mary"
+        self.assertTrue(hook.check(request[0], request[1], request[2])[0])
         self.write_response(0, 'success')
         git_async_result(git_call)
 
@@ -387,7 +394,8 @@ class TestRestrictBranches(TestBase):
 
         git_call = git_async(['push', '-u', 'origin', 'master:release/another'], self.repo)
         request = self.get_request()
-        self.assertFalse(hook.check(request[0], request[1], request[2], "myself")[0])
+        hook.params['user_name'] = os.environ['STASH_USER_NAME']
+        self.assertFalse(hook.check(request[0], request[1], request[2])[0])
         self.write_response(0, 'success')
         git_async_result(git_call)
 
@@ -397,7 +405,9 @@ class TestRestrictBranches(TestBase):
         git(['commit', '-m', 'second commit'])
 
         git_call = git_async(['push', '-u', 'origin', 'master:release/another'], self.repo)
-        self.assertTrue(hook.check(request[0], request[1], request[2], "john")[0])
+        hook.params['user_name'] = "john"
+        self.assertTrue(hook.check(request[0], request[1], request[2])[0])
+        hook.params['user_name'] = os.environ['STASH_USER_NAME']
         self.write_response(0, 'success')
         git_async_result(git_call)
 
@@ -413,6 +423,8 @@ class TestLineEndings(TestBase):
         git(['commit', '-m', 'initial commit'])
         git_call = git_async(['push', '-u', 'origin', 'master'], self.repo)
         request = self.get_request()
+
+        import hookutil
 
         self.assertEquals(hookutil.get_attr(self.repo, request[2], 'a.txt', 'binary'),
                           'set')
@@ -438,8 +450,8 @@ class TestLineEndings(TestBase):
         git_call = git_async(['push', '-u', 'origin', 'master'], self.repo)
         request = self.get_request()
 
-        hook = line_endings.Hook(self.remote_repo, [])
-        self.assertTrue(hook.check(request[0], request[1], request[2], "myself")[0])
+        hook = line_endings.Hook(self.remote_repo, [], self.params)
+        self.assertTrue(hook.check(request[0], request[1], request[2])[0])
 
         self.write_response(0, 'success')
         git_async_result(git_call)
@@ -459,8 +471,8 @@ class TestLineEndings(TestBase):
         git_call = git_async(['push', '-u', 'origin', 'master'], self.repo)
         request = self.get_request()
 
-        hook = line_endings.Hook(self.remote_repo, [])
-        permit, messages = hook.check(request[0], request[1], request[2], "myself")
+        hook = line_endings.Hook(self.remote_repo, [], self.params)
+        permit, messages = hook.check(request[0], request[1], request[2])
         self.assertFalse(permit)
         self.assertTrue(len(messages) == 2)
         self.assertTrue([message['text'] for message in messages] == [
@@ -484,8 +496,8 @@ class TestPyIndent(TestBase):
         git_call = git_async(['push', '-u', 'origin', 'master'], self.repo)
         request = self.get_request()
 
-        hook = py_indent.Hook(self.remote_repo, [])
-        self.assertTrue(hook.check(request[0], request[1], request[2], "myself")[0])
+        hook = py_indent.Hook(self.remote_repo, [], self.params)
+        self.assertTrue(hook.check(request[0], request[1], request[2])[0])
 
         self.write_response(0, 'success')
         git_async_result(git_call)
@@ -502,8 +514,8 @@ class TestPyIndent(TestBase):
         git_call = git_async(['push', '-u', 'origin', 'master'], self.repo)
         request = self.get_request()
 
-        hook = py_indent.Hook(self.remote_repo, [])
-        permit, messages = hook.check(request[0], request[1], request[2], "myself")
+        hook = py_indent.Hook(self.remote_repo, [], self.params)
+        permit, messages = hook.check(request[0], request[1], request[2])
         self.assertFalse(permit)
         self.assertTrue(len(messages) == 2)
         self.assertTrue([message['text'] for message in messages] == [
@@ -527,8 +539,8 @@ class TestNotify(TestBase):
         git_call = git_async(['push', '-u', 'origin', 'master'], self.repo)
         request = self.get_request()
 
-        hook = notify.Hook(self.remote_repo, [])
-        owners = hook.compose_mail(request[0], request[1], request[2], "anon")
+        hook = notify.Hook(self.remote_repo, [], self.params)
+        owners = hook.compose_mail(request[0], request[1], request[2])
 
         self.assertTrue('myself@gmail.com' in owners)
         text = owners['myself@gmail.com']
@@ -570,8 +582,8 @@ class TestNotify(TestBase):
         git_call = git_async(['push', '-u', 'origin', 'master'], self.repo)
         request = self.get_request()
 
-        hook = notify.Hook(self.remote_repo, [])
-        owners = hook.compose_mail(request[0], request[1], request[2], "anon")
+        hook = notify.Hook(self.remote_repo, [], self.params)
+        owners = hook.compose_mail(request[0], request[1], request[2])
 
         self.assertTrue('somebody@gmail.com' in owners)
         self.assertTrue(len(owners) == 1)
@@ -590,8 +602,8 @@ class TestNotify(TestBase):
         git_call = git_async(['push', '-u', 'origin', 'master'], self.repo)
         request = self.get_request()
 
-        hook = notify.Hook(self.remote_repo, [])
-        owners = hook.compose_mail(request[0], request[1], request[2], "anon")
+        hook = notify.Hook(self.remote_repo, [], self.params)
+        owners = hook.compose_mail(request[0], request[1], request[2])
 
         self.assertTrue('somebody@gmail.com' in owners)
         text = owners['somebody@gmail.com']
@@ -617,28 +629,10 @@ class TestNotify(TestBase):
         git_call = git_async(['push', '-u', 'origin', 'master:one'], self.repo)
         request = self.get_request()
 
-        hook = notify.Hook(self.remote_repo, [])
-        owners = hook.compose_mail(request[0], request[1], request[2], "anon")
+        hook = notify.Hook(self.remote_repo, [], self.params)
+        owners = hook.compose_mail(request[0], request[1], request[2])
 
         self.assertTrue(owners == {})
-
-        self.write_response(0, 'success')
-        git_async_result(git_call)
-
-    def test_bad_owner(self):
-        write_string('a.txt', 'data')
-        write_string('.gitattributes', 'a.txt owners=somebody@gmail.com,myself')
-        git(['add', 'a.txt', '.gitattributes'])
-        git(['commit', '-m', 'initial commit'])
-
-        git_call = git_async(['push', '-u', 'origin', 'master'], self.repo)
-        request = self.get_request()
-
-        hook = notify.Hook(self.remote_repo, [])
-        with self.assertRaises(RuntimeError) as err:
-            hook.compose_mail(request[0], request[1], request[2], "anon")
-
-        self.assertTrue("'myself'" in str(err.exception))
 
         self.write_response(0, 'success')
         git_async_result(git_call)
@@ -671,8 +665,8 @@ class TestNotify(TestBase):
 
         git_call = git_async(['push', '-u', 'origin', 'master'], self.repo)
         request = self.get_request()
-        hook = notify.Hook(self.remote_repo, [])
-        owners = hook.compose_mail(request[0], request[1], request[2], "anon")
+        hook = notify.Hook(self.remote_repo, [], self.params)
+        owners = hook.compose_mail(request[0], request[1], request[2])
 
         self.assertTrue('somebody@gmail.com' in owners)
         text = owners['somebody@gmail.com']
@@ -684,7 +678,7 @@ class TestNotify(TestBase):
         git_async_result(git_call)
 
     def test_successful_hook(self):
-        assert hookconfig.devmail != None, 'please configure devmail and send_from to run this test'
+        assert hookconfig.smtp_from != None, 'please configure smtp_from to run this test'
 
         write_string('a.txt', 'data')
         write_string('b.txt', 'data')
@@ -697,7 +691,7 @@ class TestNotify(TestBase):
         git_async_result(git_call)
 
         write_string('b.txt', 'dat')
-        write_string('.gitattributes', '*.txt owners=%s' % hookconfig.devmail)
+        write_string('.gitattributes', '*.txt owners=%s' % hookconfig.smtp_from)
         git(['add', 'b.txt', '.gitattributes'])
         git(['commit', '-m', 'second commit'])
         sleep(1)
@@ -711,8 +705,11 @@ class TestNotify(TestBase):
         git_call = git_async(['push', '-u', 'origin', 'master'], self.repo)
         request = self.get_request()
 
-        hook = notify.Hook(self.remote_repo, [])
-        hook.check(request[0], request[1], request[2], "anon")
+        settings = [
+            "refs/heads/master"
+        ]
+        hook = notify.Hook(self.remote_repo, settings, self.params)
+        hook.check(request[0], request[1], request[2])
 
         self.write_response(0, 'success')
         git_async_result(git_call)

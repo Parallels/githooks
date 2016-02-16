@@ -24,15 +24,13 @@ from email.MIMEMultipart import MIMEMultipart
 from email.MIMEText import MIMEText
 from email.Utils import formatdate, make_msgid
 
-import hookconfig
-
 
 def run(cmd, exec_dir=os.getcwd(), env=None, check_ret=True):
     '''
     Execute a command in 'exec_dir' directory.
     '''
     log_cmd = ' '.join(cmd[:10] + [" ... (cut %s)" % (len(cmd)-10)] if len(cmd) > 10 else cmd)
-    logging.debug("Run cmd: '%s'", log_cmd)
+    logging.debug("Run: '%s'", log_cmd)
 
     proc = subprocess.Popen(cmd,
                             stdout=subprocess.PIPE,
@@ -197,7 +195,7 @@ def parse_git_show(repo, sha, extensions=None):
     return show_json
 
 
-def send_mail(mail_to, smtp_from, subject):
+def send_mail(mail_to, smtp_from, subject, smtp_server, smtp_port):
     '''
     Connect to the server once and send all mails
     from 'mail_to' dictionary. Contains emails as
@@ -209,9 +207,6 @@ def send_mail(mail_to, smtp_from, subject):
     if not mail_to:
         logging.debug('No mails to send, mail_to empty')
         return
-
-    smtp_server = hookconfig.smtp_server
-    smtp_port = hookconfig.smtp_port
 
     logging.debug("Connecting to the server '%s:%s'", smtp_server, smtp_port)
     smtp = smtplib.SMTP(smtp_server, smtp_port)

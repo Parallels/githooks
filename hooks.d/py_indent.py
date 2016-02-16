@@ -19,13 +19,14 @@ import hookutil
 
 class Hook(object):
 
-    def __init__(self, repo_dir, settings):
+    def __init__(self, repo_dir, settings, params):
         self.repo_dir = repo_dir
         self.settings = settings
+        self.params = params
 
-    def check(self, branch, old_sha, new_sha, pusher):
-        logging.debug("branch='%s', old_sha='%s', new_sha='%s', pusher='%s'",
-                      branch, old_sha, new_sha, pusher)
+    def check(self, branch, old_sha, new_sha):
+        logging.debug("branch='%s', old_sha='%s', new_sha='%s', params='%s'",
+                      branch, old_sha, new_sha, self.params)
         permit = True
 
         # Do not run the hook if the branch is being deleted
