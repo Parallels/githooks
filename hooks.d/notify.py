@@ -23,7 +23,7 @@ import re
 import itertools
 from textwrap import wrap
 import logging
-import hookconfig
+
 import hookutil
 
 
@@ -91,9 +91,9 @@ class Hook(object):
         pusher = self.params['user_name']
         proj_key = self.params['proj_key']
         repo_name = self.params['repo_name']
-        smtp_server = hookconfig.smtp_server
-        smtp_port = hookconfig.smtp_port
-        smtp_from = hookconfig.smtp_from
+        smtp_server = self.params['smtp_server']
+        smtp_port = self.params['smtp_port']
+        smtp_from = self.params['smtp_from']
 
         # Do not run the hook if the branch is being deleted
         if new_sha == '0' * 40:

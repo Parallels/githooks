@@ -23,6 +23,7 @@ https://github.com/ngsru/atlassian-external-hooks/wiki/Configuration
 import os
 import sys
 import json
+import ConfigParser
 import fileinput
 import logging
 
@@ -36,6 +37,9 @@ def configure_defaults():
     '''
     Validate Stash and external-hooks plugin environment required
     to run the hooks. Configure default githooks source layout.
+
+    Note: these values can be overriden by values in DEFAULT section
+    of githooks.ini.
     '''
     params = {}
     try:
@@ -54,12 +58,52 @@ def configure_defaults():
 
     return params
 
-def load_hooks(config, params, repo=os.getcwd()):
+def load_conf_file(conf_dir, conf_file):
+    '''
+    Load githooks configuration from conf_dir/conf_file.
+    conf_file may be a relative path to conf.
+    '''
+    conf_path = os.path.join(conf_dir, conf_file)
+    try:
+        with open(conf_path) as f:
+            conf = json.loads(f.read())
+        logging.debug("Loaded: '%s'", conf_path)
+    except IOError as err:
+        logging.error(str(err))
+        raise RuntimeError(str(err))
+
+    return conf
+
+def load_ini_file(ini_dir, ini_file):
+    '''
+    Load githooks .ini configuration from ini_dir/ini_file.
+    '''
+    ini = ConfigParser.SafeConfigParser()
+
+    ini_path = os.path.join(ini_dir, ini_file)
+    try:
+        with open(ini_path) as f:
+            ini.readfp(f)
+    except IOError as err:
+        logging.error(str(err))
+        raise RuntimeError(str(err))
+
+    return ini
+
+def load_hooks(config, params, ini, repo=os.getcwd()):
     hooks = []
     for hook in config:
+        hook_env = params
+        # Load hook specific environment from githooks .ini
+        try:
+            hook_env.update(dict(ini.items(hook)))
+        except Exception as err:
+            logging.debug(str(err))
+
+        # Load the hooks from hooks_dir
         try:
             module = __import__(hook)
-            hooks.append(module.Hook(repo, config[hook], params))
+            hooks.append(module.Hook(repo, config[hook], hook_env))
         except ImportError as err:
             message = "Could not load hook: '%s' (%s)" % (hook, str(err))
             logging.error(message)
@@ -70,26 +114,28 @@ def load_hooks(config, params, repo=os.getcwd()):
 if __name__ == '__main__':
     params = configure_defaults()
 
+    ini = load_ini_file(this_file_path, 'githooks.ini')
+    # Override default params
+    if ini.defaults():
+        params.update(dict(ini.defaults()))
+
     # Set up logging
     logging.basicConfig(format='%(asctime)s %(levelname)s [%(filename)s:%(lineno)d] %(message)s',
                         level=logging.DEBUG,
                         filename=params['log_file'])
     logging.debug("In '%s'", os.getcwd())
 
-    conf_path = os.path.join(params['conf_dir'], sys.argv[1])
-    remainder = sys.argv[2:]
+    conf_file = sys.argv[1]
+    conf = load_conf_file(params['conf_dir'], conf_file)
 
-    # Look for config files only in safe-dir
-    with open(conf_path) as f:
-        conf = json.loads(f.read())
-    logging.debug("Loaded: '%s'", conf_path)
+    stdin = sys.argv[2:]
 
-    hooks = load_hooks(conf, params)
+    hooks = load_hooks(conf, params, ini)
 
     permit = True
 
     # Read in each ref that the user is trying to update.
-    for line in fileinput.input(remainder):
+    for line in fileinput.input(stdin):
         old_sha, new_sha, branch = line.strip().split(' ')
 
         for hook in hooks:

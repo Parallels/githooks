@@ -47,6 +47,7 @@ cp hooks.d/*.py $STASH_HOME/external-hooks/hooks.d
 chmod +x $STASH_HOME/external-hooks/githooks.py
 chmod +x $STASH_HOME/external-hooks/hooks.d/*.py
 # Copy hook configuration files
+cp githooks.ini $STASH_HOME/external-hooks
 cp `pwd`/pre-receive.conf.sample $STASH_HOME/external-hooks/conf/$STASH_PROJECT_KEY/$STASH_REPO_NAME/pre-receive.conf
 cp `pwd`/post-receive.conf.sample $STASH_HOME/external-hooks/conf/$STASH_PROJECT_KEY/$STASH_REPO_NAME/post-receive.conf
 
