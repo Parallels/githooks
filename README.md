@@ -1,7 +1,7 @@
 # Git Hooks for Atlassian Stash
 
-This is the git hooks implementation for [Atlassian Stash](https://www.atlassian.com/software/bitbucket/server)
-External Hooks plugin. This plugin provides an opportunity to add pre-
+This is the git hooks implementation for [Atlassian Bitbucket Server](https://www.atlassian.com/software/bitbucket/server)
+(former Stash) External Hooks plugin. This plugin provides an opportunity to add pre-
 or post-receive hooks without writting them in Java.
 
 * [External Hooks plugin wiki](https://github.com/ngsru/atlassian-external-hooks/wiki)
@@ -120,15 +120,15 @@ are 2 basic options:
   2. Create a wildcard "allow" rule that matches everything and then
 add "deny" rules to restrict specific locations.
 
-* __hooks.d/line_endings.py__: A hook script to deny commiting files
-with mixed line endings
+* __hooks.d/line_endings.py__: A hook script for denying commiting
+files with mixed line endings
 
 Checks if any of the files modified in a pushed ref contains both CRLF
 and LF line endings. Aborts the pushing, if so.
 
 Settings format: None
 
-* __hooks.d/py_indent.py__: A hook script to check python scripts
+* __hooks.d/py_indent.py__: A hook script for checking python scripts
 indentation
 
 Checks if any of the python scripts modified in a pushed ref are
@@ -136,14 +136,15 @@ indented with tabs and spaces. Aborts the pushing, if so.
 
 Settings format: None
 
-* __hooks.d/notify.py__: A hook script to notify file owners of any
-changes made to their files
+* __hooks.d/notify.py__: A hook script for notifying path subscribers
+of changes made to those paths
 
 Reports who made the change, the ref and the list of changed files to
-the file owners assigned via .gitattributes.
+the subscribers defined via git attributes.
 
 Putting the following .gitattibutes file in a repository will result in
-reporting to karl@gmail.com every pushed ref with changes to *.py files.
+reporting to karl@gmail.com every pushed commit with changes to *.py
+files.
 
 ```
 *.py owners=karl@gmail.com
@@ -151,23 +152,33 @@ reporting to karl@gmail.com every pushed ref with changes to *.py files.
 
 `owners` can be a list of email addresses separated by comma.
 
-Settings format: None
+Settings format:
+```
+[
+    "refs/heads/ref_name",
+    "refs/tags/tag_name",
+    ...
+]
+```
+A list of full ref names where changes are reported, a per-repository
+setting.
+
 
 ## Requirements
 
-* [Atlassian Stash](https://www.atlassian.com/software/bitbucket/server)
-* [External Hooks plugin](https://marketplace.atlassian.com/plugins/com.ngs.stash.externalhooks.external-hooks/server/overview)
+* [Atlassian Bitbucket Server (Stash)](https://www.atlassian.com/software/bitbucket/server)
+* Bitbucket Server (Stash) compatible [External Hooks plugin](https://marketplace.atlassian.com/plugins/com.ngs.stash.externalhooks.external-hooks/server/overview)
 * Python 2.6 or higher
 
 *Note:* Tested in the following stack:
 * CentOS 6
-* Atlassian Stash 3.11.1
-* External Hooks plugin 2.5-1
+* Atlassian Stash 3.11.1/Bitbucket Server 4.3.2
+* External Hooks plugin 2.5-1/3.0-1
 * Python 2.6
 
 ## Installation and Basic Setup
 
-* Install and configure [Atlassian Stash](https://confluence.atlassian.com/display/STASH0212/Getting+started)
+* Install and configure [Atlassian Bitbucket Server (Stash)](https://confluence.atlassian.com/display/STASH0212/Getting+started)
 * Install [External Hooks plugin](https://marketplace.atlassian.com/plugins/com.ngs.stash.externalhooks.external-hooks/server/overview)
 * To deploy githooks on a Stash server, clone this repo to
 STASH_HOME/external-hooks:
@@ -176,11 +187,11 @@ STASH_HOME/external-hooks:
 $ git clone git://github.com/Parallels/githooks.git $STASH_HOME/external-hooks
 ```
 
-Then, edit `$STASH_HOME/external-hooks/hooks.d/hookconfig.py` and put
-your githooks configuration files in $STASH_HOME/external-hooks/conf
+Then, edit `$STASH_HOME/external-hooks/githooks.ini` and put your
+githooks configuration files in $STASH_HOME/external-hooks/conf
 (pre-receive.conf.sample and post-receive.conf.sample demonstrate the
-minimal configuration). Change the files mode so that the user that
-runs Stash (`stash` by default) owns the files. Python scripts must
+minimal setup). Change the files mode so that the user that runs Stash
+(`stash`/`bitbucket` by default) owns the files. Python scripts must
 be executable:
 
 ```
@@ -189,14 +200,28 @@ $ chgrp -R stash $STASH_HOME/external-hooks
 $ chmod -R 755 $STASH_HOME/external-hooks
 ```
 
+Note: default githooks layout can be overriden in [DEFAULT] section of
+`githooks.ini`:
+
+```
+[DEFAULT]
+; githooks logfile
+log_file = %(LOGFILE)s
+; where to look for .conf files
+conf_dir = %(CONFDIR)s
+; where to look for hook scripts
+hooks_dir = %(HOOKSDIR)s
+...
+```
+
 * Go to repository Settings -> (Workflow) Hooks. Enable and configure
 External Pre Receive and Post Receive Hooks. Set __Executable__ to
 `githooks.py` and check 'Look for hooks only in safe dir'. Put the path
 to a configuration file in __Positional parameters__; `githooks.py`
-expects a path that is relative to safe-dir/conf.
+expects a path that is relative to safe-dir/conf/PROJECT_KEY/REPO_NAME.
 
-*Note:* `githooks.py` expects that safe dir is STASH_HOME/external-hooks.
-If it is different for your Stash instance please report it on the
+*Note:* `githooks.py` is set up for the plugin safe dir STASH_HOME/external-hooks.
+If it is different for your Stash/Bitbucket Server instance please report it on the
 [issue tracker](https://github.com/Parallels/githooks).
 
 ## Getting Help
@@ -206,19 +231,19 @@ report it on the [issue tracker](https://github.com/Parallels/githooks).
 
 ## Development
 
-Configure __notify__ hook script unittests in `hookconfig.py`. Edit
-SMTP relay settings and developer email address `devmail`. This address
-is used to test notifications that __notify__ hook script sends.
+Before running __notify__ hook script unittests, edit SMTP relay
+settings and smtp_from email address. This address is used to test
+the code that sends notifications via a relay.
 
 To run the unittests:
 ```
 $ python -m unittest test
 ```
 
-To deploy a repo with githooks installed:
+To deploy a repository with githooks installed (in pwd/testroot):
 
 ```
-$ make_repo.sh
+$ source make_repo.sh
 ```
 
 ## License and Authors
