@@ -7,8 +7,8 @@ Unit tests for githooks
 
 How it works:
 
-* Create a workspace tmp/ in cwd, set up a remote repo and a local
-  repo there.
+* Create a workspace tmp/ in cwd, set up a dummy STASH_HOME,
+  a remote repo and a local repo there.
 
 * Replace temp/remote_repo.git/hooks/update in the remote repo with
   hook_fixture.py. The hook_fixture.py script doesn’t do anything
@@ -90,34 +90,30 @@ class TestBase(unittest.TestCase):
         self.cleanUp()
         os.mkdir(self.base)
 
+        self.remote_repo = os.path.join(self.base, 'remote_repo.git')
+        self.repo = os.path.join(self.base, 'repo')
+
         os.environ['STASH_HOME'] = os.path.join(self.base, 'stash')
         os.environ['STASH_USER_NAME'] = os.environ['USER']
         os.environ['STASH_BASE_URL'] = 'https://STASH'
         os.environ['STASH_PROJECT_KEY'] = 'TEST'
         os.environ['STASH_REPO_NAME'] = 'unittest'
 
-        self.params = githooks.configure_defaults()
+        conf_dir = os.path.join(os.environ['STASH_HOME'], 'external-hooks', 'conf')
+        os.makedirs(conf_dir)
 
-        ini = githooks.load_ini_file(self.cwd, 'testhooks.ini')
-        if ini.defaults():
-            self.params.update(dict(ini.defaults()))
+        # Create test.conf
+        with open(os.path.join(conf_dir, 'test.conf'), 'w') as f:
+            f.write(json.dumps({"restrict_branches":[],
+                                "line_endings":[],
+                                "py_indent":[],
+                                "notify":[]},
+                                indent=4))
 
-        logging.basicConfig(format='%(filename)s:%(lineno)d# %(levelname)-8s [%(asctime)s]  %(message)s',
-                            level=logging.DEBUG,
-                            filename=self.params['log_file'])
+        gh = githooks.Githooks(conf_file='test.conf', ini_file='testhooks.ini',
+                               repo_dir=self.remote_repo)
 
-        conf = {
-                "restrict_branches": [],
-                "line_endings": [],
-                "py_indent": [],
-                "notify": []
-        }
-
-        self.remote_repo = os.path.join(self.base, 'remote_repo.git')
-        self.repo = os.path.join(self.base, 'repo')
-
-        sys.path.append(self.params['hooks_dir'])
-        self.hooks = dict(zip(conf.keys(), githooks.load_hooks(conf, self.params, ini, self.remote_repo)))
+        self.hooks = dict(zip(gh.conf.keys(), gh.hooks))
 
         # Set up repositories
         self.__setup_remote_repo()

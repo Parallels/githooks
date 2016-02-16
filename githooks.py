@@ -12,9 +12,9 @@
 '''
 Stash external hooks entry point
 
-Executes hooks from this_file_path/hooks.d as specified in
-the configuration file (passed as parameter). Reads stdin and passes
-it to each executed hook.
+Executes hooks from hooks.d as specified in the configuration file
+(passed as parameter). Reads stdin and passes it to each executed
+hook.
 
 On how to configure external hooks see
 https://github.com/ngsru/atlassian-external-hooks/wiki/Configuration
@@ -26,11 +26,6 @@ import json
 import ConfigParser
 import fileinput
 import logging
-
-encoding = sys.getfilesystemencoding()
-this_file_path = os.path.dirname(unicode(__file__, encoding))
-hooks_dir = os.path.join(this_file_path, 'hooks.d')
-sys.path.append(hooks_dir)
 
 
 def configure_defaults():
@@ -58,95 +53,126 @@ def configure_defaults():
 
     return params
 
-def load_conf_file(conf_dir, conf_file):
+
+class Githooks(object):
     '''
-    Load githooks configuration from conf_dir/conf_file.
-    conf_file may be a relative path to conf.
+    Initialize and run githooks.
     '''
-    conf_path = os.path.join(conf_dir, conf_file)
-    try:
-        with open(conf_path) as f:
-            conf = json.loads(f.read())
-        logging.debug("Loaded: '%s'", conf_path)
-    except IOError as err:
-        logging.error(str(err))
-        raise RuntimeError(str(err))
+    def __init__(self, conf_file, ini_file, repo_dir=os.getcwd()):
+        self.this_file_path = os.path.dirname(unicode(__file__, sys.getfilesystemencoding()))
 
-    return conf
+        self.params = configure_defaults()
 
-def load_ini_file(ini_dir, ini_file):
-    '''
-    Load githooks .ini configuration from ini_dir/ini_file.
-    '''
-    ini = ConfigParser.SafeConfigParser()
+        self.ini = self.__load_ini_file(ini_file)
+        # Override default params
+        if self.ini.defaults():
+            self.params.update(dict(self.ini.defaults()))
 
-    ini_path = os.path.join(ini_dir, ini_file)
-    try:
-        with open(ini_path) as f:
-            ini.readfp(f)
-    except IOError as err:
-        logging.error(str(err))
-        raise RuntimeError(str(err))
+        # Set up logging
+        logging.basicConfig(format='%(asctime)s %(levelname)s [%(filename)s:%(lineno)d] %(message)s',
+                            level=logging.DEBUG,
+                            filename=self.params['log_file'])
 
-    return ini
+        self.repo_dir = repo_dir
+        logging.debug("In '%s'", self.repo_dir)
 
-def load_hooks(config, params, ini, repo=os.getcwd()):
-    hooks = []
-    for hook in config:
-        hook_env = params
-        # Load hook specific environment from githooks .ini
+        self.conf = self.__load_conf_file(conf_file)
+
+        sys.path.append(self.params['hooks_dir'])
+        self.hooks = self.load()
+
+    def __load_conf_file(self, conf_file):
+        '''
+        Load githooks configuration from conf_dir/conf_file.
+        conf_file may be a relative path to conf.
+        '''
+        conf_dir = self.params['conf_dir']
+
+        conf_path = os.path.join(conf_dir, conf_file)
         try:
-            hook_env.update(dict(ini.items(hook)))
-        except Exception as err:
-            logging.debug(str(err))
+            with open(conf_path) as f:
+                conf = json.loads(f.read())
+            logging.debug("Loaded: '%s'", conf_path)
+        except IOError as err:
+            logging.error(str(err))
+            raise RuntimeError(str(err))
 
-        # Load the hooks from hooks_dir
+        return conf
+
+    def __load_ini_file(self, ini_file):
+        '''
+        Load githooks .ini configuration from this_file_path/ini_file.
+        '''
+        ini_dir = self.this_file_path
+
+        ini = ConfigParser.SafeConfigParser()
+
+        ini_path = os.path.join(ini_dir, ini_file)
         try:
-            module = __import__(hook)
-            hooks.append(module.Hook(repo, config[hook], hook_env))
-        except ImportError as err:
-            message = "Could not load hook: '%s' (%s)" % (hook, str(err))
-            logging.error(message)
-            raise RuntimeError(message)
-    return hooks
+            with open(ini_path) as f:
+                ini.readfp(f)
+        except IOError as err:
+            logging.error(str(err))
+            raise RuntimeError(str(err))
+
+        return ini
+
+    def load(self):
+        '''
+        Load the hooks from hooks.d.
+        '''
+        params = self.params
+        conf = self.conf
+        ini = self.ini
+        repo_dir = self.repo_dir
+
+        hooks = []
+        for hook in conf:
+            hook_params = params
+
+            # Load hook specific environment from githooks .ini
+            try:
+                hook_params.update(dict(ini.items(hook)))
+            except Exception as err:
+                logging.debug(str(err))
+
+            # Load the hooks from hooks_dir
+            try:
+                module = __import__(hook)
+                hooks.append(module.Hook(repo_dir, conf[hook], hook_params))
+            except ImportError as err:
+                message = "Could not load hook: '%s' (%s)" % (hook, str(err))
+                logging.error(message)
+                raise RuntimeError(message)
+
+        return hooks
+
+    def run(self, stdin):
+        '''
+        Run the hooks as specified in the given configuration file.
+        Report messages and status.
+        '''
+        hooks = self.hooks
+
+        permit = True
+
+        # Read in each ref that the user is trying to update
+        for line in fileinput.input(stdin):
+            old_sha, new_sha, branch = line.strip().split(' ')
+
+            for hook in hooks:
+                status, messages = hook.check(branch, old_sha, new_sha)
+
+                for message in messages:
+                    print "[%s @ %s]: %s" % (branch, message['at'], message['text'])
+
+                permit = permit and status
+
+        if not permit:
+            sys.exit(1)
+
+        sys.exit(0)
 
 
 if __name__ == '__main__':
-    params = configure_defaults()
-
-    ini = load_ini_file(this_file_path, 'githooks.ini')
-    # Override default params
-    if ini.defaults():
-        params.update(dict(ini.defaults()))
-
-    # Set up logging
-    logging.basicConfig(format='%(asctime)s %(levelname)s [%(filename)s:%(lineno)d] %(message)s',
-                        level=logging.DEBUG,
-                        filename=params['log_file'])
-    logging.debug("In '%s'", os.getcwd())
-
-    conf_file = sys.argv[1]
-    conf = load_conf_file(params['conf_dir'], conf_file)
-
-    stdin = sys.argv[2:]
-
-    hooks = load_hooks(conf, params, ini)
-
-    permit = True
-
-    # Read in each ref that the user is trying to update.
-    for line in fileinput.input(stdin):
-        old_sha, new_sha, branch = line.strip().split(' ')
-
-        for hook in hooks:
-            status, messages = hook.check(branch, old_sha, new_sha)
-
-            for message in messages:
-                print "[%s @ %s]: %s" % (branch, message['at'], message['text'])
-
-            permit = permit and status
-
-    if not permit:
-        sys.exit(1)
-
-    sys.exit(0)
+    Githooks(conf_file=sys.argv[1], ini_file='githooks.ini').run(sys.argv[2:])
