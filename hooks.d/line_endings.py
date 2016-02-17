@@ -59,13 +59,10 @@ class Hook(object):
                     logging.debug("Deleted '%s', skip", modfile['path'])
                     continue
 
-                text_attr = hookutil.get_attr(
-                    self.repo_dir, new_sha, modfile['path'], 'text')
+                binary_attr = hookutil.get_attr(
+                    self.repo_dir, new_sha, modfile['path'], 'binary')
 
-                # Attr 'text' enables eol normalization, so
-                # the file won't have crlf when the attr is set
-                if text_attr == 'unspecified':
-
+                if binary_attr != 'set':
                     cmd = ['git', 'show', modfile['new_blob']]
                     _, file_contents, _ = hookutil.run(cmd, self.repo_dir)
 
