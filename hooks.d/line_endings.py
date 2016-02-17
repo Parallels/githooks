@@ -66,7 +66,6 @@ class Hook(object):
                 # the file won't have crlf when the attr is set
                 if text_attr == 'unspecified':
 
-                    # TODO assert it's of blob type
                     cmd = ['git', 'show', modfile['new_blob']]
                     _, file_contents, _ = hookutil.run(cmd, self.repo_dir)
 
@@ -75,7 +74,8 @@ class Hook(object):
                         messages.append({'at': commit['commit'],
                             'text': "Error: file '%s' has mixed line endings (CRLF/LF)" % modfile['path']})
 
-                permit = permit and permit_file
+                    permit = permit and permit_file
+
                 logging.debug("modfile='%s', permit='%s'", modfile['path'], permit)
 
         return permit, messages
