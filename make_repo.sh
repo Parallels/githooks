@@ -30,6 +30,7 @@ test_root=`pwd`/tmp
 rm -rf $test_root
 mkdir $test_root
 
+unset BITBUCKET_HOME
 export STASH_HOME=$test_root/stash
 export STASH_USER_NAME=$USER
 export STASH_BASE_URL="http://STASH"

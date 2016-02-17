@@ -38,7 +38,13 @@ def configure_defaults():
     '''
     params = {}
     try:
-        params['stash_home'] = os.environ['STASH_HOME']
+        # STASH_HOME for Atlassian Stash (ver < 4)
+        # BITBUCKET_HOME for Atlassian Bitbucket Server (rebranded Stash ver >= 4)
+        if 'BITBUCKET_HOME' in os.environ:
+            params['stash_home'] = os.environ['BITBUCKET_HOME']
+        else:
+            params['stash_home'] = os.environ['STASH_HOME']
+        # These environment variables come from External Hooks plugin
         params['user_name'] = os.environ['STASH_USER_NAME']
         params['base_url'] = os.environ['STASH_BASE_URL']
         params['proj_key'] = os.environ['STASH_PROJECT_KEY']

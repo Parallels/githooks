@@ -93,13 +93,13 @@ class TestBase(unittest.TestCase):
         self.remote_repo = os.path.join(self.base, 'remote_repo.git')
         self.repo = os.path.join(self.base, 'repo')
 
-        os.environ['STASH_HOME'] = os.path.join(self.base, 'stash')
+        os.environ['BITBUCKET_HOME'] = os.path.join(self.base, 'stash')
         os.environ['STASH_USER_NAME'] = os.environ['USER']
         os.environ['STASH_BASE_URL'] = 'https://STASH'
         os.environ['STASH_PROJECT_KEY'] = 'TEST'
         os.environ['STASH_REPO_NAME'] = 'unittest'
 
-        conf_dir = os.path.join(os.environ['STASH_HOME'], 'external-hooks', 'conf')
+        conf_dir = os.path.join(os.environ['BITBUCKET_HOME'], 'external-hooks', 'conf')
         os.makedirs(conf_dir)
 
         # Create test.conf
