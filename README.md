@@ -11,7 +11,7 @@ or post-receive hooks without writting them in Java.
 Pre- and post-receive hooks are invoked on the remote repository, when
 a git push is done on a local repository.
 
-Pre-receive hook executes just before starting to update refs on the
+__Pre-receive hook__ executes just before starting to update refs on the
 remote repository, so it’s a good place to enforce any kind of
 development policy. Its exit status determines the success or failure
 of the update. If you don’t like who is doing the pushing, how the
@@ -20,7 +20,7 @@ you can simply reject it. While you can’t stop developers from making
 malformed commits, you can prevent these commits from entering the
 official codebase by rejecting them with pre-receive.
 
-Post-receive hook executes on the remote repository once after all the
+__Post-receive hook__ executes on the remote repository once after all the
 refs have been updated. Performing notifications and triggering a
 continuous integration system are common use cases for post-receive.
 
@@ -34,36 +34,46 @@ updated they receive a line of the format:
 
 on standard input.
 
-We have implemented 4 hook scripts:
+## Githooks Framework
 
-* hooks.d/restrict_branches.py (restrict commits to specific branches)
-* hooks.d/line_endings.py (deny commiting files with mixed line endings)
-* hooks.d/py_indent.py (check basic indentation in python scripts)
-* hooks.d/notify.py (notify file owners of any changes made to their files)
+We have implemented pre- and post-receive hooks as a collection of
+pluggable modules. `githooks.py` serves as an entry point to them,
+which loads and runs the modules specified in a configuration file
+passed to `githooks.py` via command line. `githooks.py` reads the
+standard input and passes <old-obj-name>, <new-obj-name> and
+<updated-ref-name> to each plugin being run.
 
-and `githooks.py` as an entry point to these scripts. `githooks.py`
-executes the hook scripts specified in a configuration file passed via
-command line. Then, it reads the standard input line by line and runs
-the scripts for each ref being updated. Each script takes the name of
-the ref being updated, the old object name and the new object name
-stored in the ref as arguments. If multiple refs are pushed, returning
-a non-zero status from any of the executed hook scripts for any of the
-refs aborts all of them.
+A `githooks.py` plugin implements any desired pre- or post-receive
+action, such as indentation check or notification service. A zero
+status returned from the plugin indicates success (e.g. the ref being
+updated passed the check). A non-zero status from the plugin aborts
+the pushing.
+
+If multiple refs are pushed, returning a non-zero status from any of
+the plugins for any of the refs aborts pushing all of them.
+`githooks.py` executes plugins regardless of their return status,
+so all errors are reported at once.
 
 ## Git Hooks configuration file
 
-`githooks.py` expects the following configuration file format:
+`githooks.py` gets to know which plugins to load and in what setting
+to run them from a configuration file that must be passed to
+`githooks.py` as the first positional argument.
+
+Configuration file format: dict of plugin basenames without extension
+as keys and plugin settings as values (see [Implemented Githooks Plugins](#implemented-githooks-plugins)).
+
+Note: `githooks.py` configuration file must be a valid JSON.
 
 ```
 {
-    <script_filename_without_ext>: <hook_settings>,
+    <plugin basename without extension>: <plugin settings>,
     ...
 }
 ```
 
-E.g. running __restrict_branches__ and __line_endings__ hook scripts
-with default settings requires the following configuration file for
-`githooks.py`:
+A configuration file for running __restrict_branches__ and
+__line_endings__ plugins with default settings would be:
 
 ```
 {
@@ -72,39 +82,23 @@ with default settings requires the following configuration file for
 }
 ```
 
-*Note:* By default, __restrict_branches__ denies creating and updating
-any path for everyone. On hook script settings see below.
+## Implemented Githooks Plugins
 
-With this configuration file, `githooks.py` implements an example
-pre-receive hook. An example post-receive hook can be implemented with
-the following configuration file:
+Githooks plugins reside in hooks.d.
 
-```
-{
-    "notify": [],
-}
-```
+Note: plugin settings must be a valid JSON.
 
-## Implemented Hook Scripts
+### Pre-receive
 
-* __hooks.d/restrict_branches.py__: A hook script to restrict commits
-to specific branches.
+* __restrict_branches__ (restrict commits to specific branches)
 
-Use case: you have product release branches, that should only be
-created by product owners or build engineers. Developers should not be
-able to create release/* branches.
-
-Another use case: you want to restrict development to specific paths
-like feature/* or bugfix/*, and deny creating branches on top level
-to prevent pollution.
-
-Settings format:
+Settings format: JSON, list of rules
 
 ```
 [
     {
-        "policy": "allow/deny",
-        "type": "create/update",
+        "policy": "allow"/"deny",
+        "type": "create"/"update",
         "branch": "<branch regex>",
         "pusher": "<pusher regex>"
     },
@@ -112,65 +106,116 @@ Settings format:
 ]
 ```
 
-The rules are applied from top to bottom. You can create either
-whitelist or blacklist rules. The default is to deny everything, so
-everything will be blocked if you create an empty list. Hence there
-are 2 basic options:
-  1. Start with empty list and then add "allow" rules,
-  2. Create a wildcard "allow" rule that matches everything and then
-add "deny" rules to restrict specific locations.
+The rules are applied from top to bottom. The default is to deny
+everything, so any action is rescticted when restrict_branches runs
+with [] setting.
 
-* __hooks.d/line_endings.py__: A hook script for denying commiting
-files with mixed line endings
+There are two ways to configure restrict_branches:
+  1. Whitelist: add "allow" rules for opening specific locations
+  2. Blacklist: On top, add a wildcard "allow" rule that matches
+everything and then add "deny" rules for restricting specific
+locations.
 
-Checks if any of the files modified in a pushed ref contains both CRLF
-and LF line endings. Aborts the pushing, if so.
-
-Settings format: None
-
-* __hooks.d/py_indent.py__: A hook script for checking python scripts
-indentation
-
-Checks if any of the python scripts modified in a pushed ref are
-indented with tabs and spaces. Aborts the pushing, if so.
-
-Settings format: None
-
-* __hooks.d/notify.py__: A hook script for notifying path subscribers
-of changes made to those paths
-
-Reports who made the change, the ref and the list of changed files to
-the subscribers defined via git attributes.
-
-Putting the following .gitattibutes file in a repository will result in
-reporting to karl@gmail.com every pushed commit with changes to *.py
-files.
+Example. You have product release branches (release/*), that only
+product owners or build engineers should be able to create.
+Developers are not allowed to create release/* branches. Also, you
+want to restrict development to specific paths feature/* and bugfix/*
+and deny creating branches on top level to prevent pollution.
 
 ```
-*.py owners=karl@gmail.com
+[
+    {
+        "policy": "allow",
+        "type"  : "create",
+        "branch": "refs/heads/release/.*",
+        "pusher": "^(<list of allowed usernames divided by |>)$"
+    },
+    {
+        "policy": "allow",
+        "type"  : "create",
+        "branch": "(refs/heads/feature/.*|refs/heads/bugfix.*)",
+        "pusher": ".*"
+    },
+    {
+        "policy": "allow",
+        "type"  : "create",
+        "branch": "refs/tags/.*",
+        "pusher": ".*"
+    },
+    {
+        "policy": "allow",
+        "type"  : "update",
+        "branch": ".*"
+        "pusher": ".*"
+    }
+]
 ```
 
-`owners` can be a list of email addresses separated by comma.
+* __line_endings__ (deny commiting files that contain both CRLF and
+LF line endings)
+
+Implements checking if any of the modified files contains both CRLF
+and LF line endings.
+
+Settings format: None, always runs with an empty list []
+
+* __py_indent__ (basic indentation check in python scripts)
+
+Implements checking if any of the modified python scripts contains
+mixed indentation (both tabs and spaces).
+
+Settings format: None, always runs with an empty list []
+
+### Post-receive
+
+* __notify__ (subscribe to some paths via .gitattributes and notify of
+changes made to those paths on specific branches)
+
+Reports changes made to paths with defined 'owners' attribute. 'owners'
+is a list of comma-separated emails. You can specify branches on which
+to report changes as a list of python regular expressions that match
+those branches. Note that this is a per-repository setting, i.e all
+subscribers will get reports from all those branches.
 
 Settings format:
 ```
 [
-    "refs/heads/ref_name",
-    "refs/tags/tag_name",
+    "refs/heads/master",
+    "refs/tags/release/.*",
     ...
 ]
 ```
-A list of full ref names where changes are reported, a per-repository
-setting.
 
+Report format: Email reports are composed for each subscriber email.
+Essentially an email report is a list of new commits in remote repo
+where paths for which 'owners' attribute value contains that email
+are modified. List of commits comes in a similar to 'git log'
+porcelain output. Additionally, the list of modified paths along with
+their status is included for each commit.
+
+```
+Branch: <branch>
+By user: <username>
+
+Commit: <commit hash> (View in Stash, clickable)
+Author: <author name> <author email>
+Date: <commit date>
+
+    <commit message, trimmed to 100 symbols>
+
+    <status: M, A or D>  <path to file>
+    ...
+
+Commit: ...
+```
 
 ## Requirements
 
-* [Atlassian Bitbucket Server (Stash)](https://www.atlassian.com/software/bitbucket/server)
-* Bitbucket Server (Stash) compatible [External Hooks plugin](https://marketplace.atlassian.com/plugins/com.ngs.stash.externalhooks.external-hooks/server/overview)
+* [Atlassian Stash/Bitbucket Server](https://www.atlassian.com/software/bitbucket/server)
+* Stash/Bitbucket Server compatible [External Hooks plugin](https://marketplace.atlassian.com/plugins/com.ngs.stash.externalhooks.external-hooks/server/overview)
 * Python 2.6 or higher
 
-*Note:* Tested in the following stack:
+Note: Tested in the following stack:
 * CentOS 6
 * Atlassian Stash 3.11.1/Bitbucket Server 4.3.2
 * External Hooks plugin 2.5-1/3.0-1
@@ -178,17 +223,17 @@ setting.
 
 ## Installation and Basic Setup
 
-* Install and configure [Atlassian Bitbucket Server (Stash)](https://confluence.atlassian.com/display/STASH0212/Getting+started)
+* Install and configure [Atlassian Stash/Bitbucket Server](https://confluence.atlassian.com/display/STASH0212/Getting+started)
 * Install [External Hooks plugin](https://marketplace.atlassian.com/plugins/com.ngs.stash.externalhooks.external-hooks/server/overview)
 * To deploy githooks on a Stash server, clone this repo to
-STASH_HOME/external-hooks:
+External Hooks safe-dir ($STASH_HOME/external-hooks):
 
 ```
 $ git clone git://github.com/Parallels/githooks.git $STASH_HOME/external-hooks
 ```
 
 Then, edit `$STASH_HOME/external-hooks/githooks.ini` and put your
-githooks configuration files in $STASH_HOME/external-hooks/conf
+githooks configuration files (.conf) in $STASH_HOME/external-hooks/conf
 (pre-receive.conf.sample and post-receive.conf.sample demonstrate the
 minimal setup). Change the files mode so that the user that runs Stash
 (`stash`/`bitbucket` by default) owns the files. Python scripts must
@@ -205,24 +250,19 @@ Note: default githooks layout can be overriden in [DEFAULT] section of
 
 ```
 [DEFAULT]
-; githooks logfile
+; githooks logfile (log/atlassian-stash-githooks.log)
 log_file = %(LOGFILE)s
-; where to look for .conf files
+; where to look for .conf files (external-hooks/conf)
 conf_dir = %(CONFDIR)s
-; where to look for hook scripts
+; where to look for hook scripts (external-hooks/hooks.d)
 hooks_dir = %(HOOKSDIR)s
-...
 ```
 
 * Go to repository Settings -> (Workflow) Hooks. Enable and configure
 External Pre Receive and Post Receive Hooks. Set __Executable__ to
 `githooks.py` and check 'Look for hooks only in safe dir'. Put the path
 to a configuration file in __Positional parameters__; `githooks.py`
-expects a path that is relative to safe-dir/conf/PROJECT_KEY/REPO_NAME.
-
-*Note:* `githooks.py` is set up for the plugin safe dir STASH_HOME/external-hooks.
-If it is different for your Stash/Bitbucket Server instance please report it on the
-[issue tracker](https://github.com/Parallels/githooks).
+expects a path that is relative to conf_dir (githooks.ini).
 
 ## Getting Help
 
@@ -231,16 +271,12 @@ report it on the [issue tracker](https://github.com/Parallels/githooks).
 
 ## Development
 
-Before running __notify__ hook script unittests, edit SMTP relay
-settings and smtp_from email address. This address is used to test
-the code that sends notifications via a relay.
-
-To run the unittests:
+Run the unittests:
 ```
 $ python -m unittest test
 ```
 
-To deploy a repository with githooks installed (in pwd/testroot):
+To deploy an emprt repository with githooks installed (in $PWD/tmp):
 
 ```
 $ source make_repo.sh
