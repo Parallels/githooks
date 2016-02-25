@@ -166,6 +166,17 @@ mixed indentation (both tabs and spaces).
 
 Settings format: None, always runs with an empty list []
 
+* __deny_non_ff__ (deny non-fast-forward pushes to specific branches)
+
+Settings format: list of branch regexps
+```
+[
+    "refs/heads/master",
+    "refs/heads/release/.*",
+    ...
+]
+```
+
 ### Post-receive
 
 * __notify__ (subscribe to some paths via .gitattributes and notify of
@@ -181,7 +192,7 @@ Settings format:
 ```
 [
     "refs/heads/master",
-    "refs/tags/release/.*",
+    "refs/heads/release/.*",
     ...
 ]
 ```

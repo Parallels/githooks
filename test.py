@@ -107,7 +107,8 @@ class TestBase(unittest.TestCase):
             f.write(json.dumps({"restrict_branches":[],
                                 "line_endings":[],
                                 "py_indent":[],
-                                "notify":[]},
+                                "notify":[],
+                                "deny_non_ff":[]},
                                 indent=4))
 
         gh = githooks.Githooks(conf_file='test.conf', ini_file='testhooks.ini',
@@ -709,6 +710,45 @@ class TestNotify(TestBase):
             "refs/heads/master"
         ]
         hook.check(request[0], request[1], request[2])
+
+        self.write_response(0, 'success')
+        git_async_result(git_call)
+
+
+class TestDenyNonFf(TestBase):
+
+    def test_successful_hook(self):
+        write_string('a.txt', 'data')
+        git(['add', 'a.txt'])
+        git(['commit', '-m', 'init'])
+        write_string('a.txt', 'newdata')
+        git(['add', 'a.txt'])
+        git(['commit', '-m', 'second'])
+        git_call = git_async(['push', '-u', 'origin', 'master'], self.repo)
+        self.get_request()
+        self.write_response(0, 'success')
+        git_async_result(git_call)
+
+        git(['reset', '--hard', 'HEAD~1'])
+        git(['checkout', '-b', 'test'])
+        write_string('a.txt', 'anothernewdata')
+        git(['add', 'a.txt'])
+        git(['commit', '-m', 'test'])
+
+        git(['checkout', 'master'])
+        git(['merge', 'test'])
+
+        git_call = git_async(['push', '-f', 'origin', 'master'], self.repo)
+        request = self.get_request()
+        hook = self.hooks["deny_non_ff"]
+        hook.settings = [
+            "refs/heads/master"
+        ]
+        permit, messages = hook.check(request[0], request[1], request[2])
+
+        self.assertFalse(permit)
+        self.assertTrue(len(messages) == 1)
+        self.assertTrue(messages[0]['text'] == 'Cannot push a non-fast-forward reference')
 
         self.write_response(0, 'success')
         git_async_result(git_call)

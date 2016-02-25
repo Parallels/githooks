@@ -47,6 +47,15 @@ def run(cmd, exec_dir=os.getcwd(), env=None, check_ret=True):
     return ret, out, err
 
 
+def git_empty_tree():
+    '''
+    Generate an empty tree hash.
+    '''
+    cmd = ['git', 'hash-object', '-t', 'tree', '/dev/null']
+    _, out, _ = run(cmd)
+    return out.strip()
+
+
 def get_attr(repo_dir, new_sha, filename, attr):
     '''
     Get git attribute 'attr' of file 'filename'.
