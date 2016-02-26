@@ -4,25 +4,12 @@
 #
 #   Deploy test environment for githooks
 #
-# This script deploys githooks in a Stash-alike environment
-# STASH_HOME=$PWD/testroot/stash. It installs githooks in
-# $STASH_HOME/external-hooks (external-hooks plugin safe-dir).
-# See:
+# This script initializes a remote repository in tmp/remote_repo.git
+# and deploys githooks in tmp/remote_repo.git/hooks with its
+# configuration files in <remote repo>/hooks/conf.
 #
-# https://github.com/ngsru/atlassian-external-hooks/wiki/Configuration
-#
-#
-# Also, the script initializes:
-#
-# 1. An empty remote repository in $PWD/testroot/remote_repo.git
-# and installs githooks sample configuration files:
-#   - pre-receive.conf.sample
-#   - post-receive.conf.sample
-#   - githooks.ini
-# in $STASH_HOME/external-hooks/conf.
-#
-# 2. A local repository in $PWD/testroot/repo and sets it
-# to track $PWD/testroot/remote_repo.git.
+# Also, the script initializes a local repository in tmp/repo and sets
+# it to track tmp/remote_repo.git.
 #
 
 
@@ -30,39 +17,54 @@ test_root=`pwd`/tmp
 rm -rf $test_root
 mkdir $test_root
 
-unset BITBUCKET_HOME
-export STASH_HOME=$test_root/stash
-export STASH_USER_NAME=$USER
-export STASH_BASE_URL="http://STASH"
-export STASH_PROJECT_KEY="LOCAL"
-export STASH_REPO_NAME="test"
-
-mkdir $STASH_HOME
-mkdir $STASH_HOME/log
-mkdir -p $STASH_HOME/external-hooks/hooks.d
-mkdir -p $STASH_HOME/external-hooks/conf/$STASH_PROJECT_KEY/$STASH_REPO_NAME
-
-# Set up the hooks
-cp githooks.py $STASH_HOME/external-hooks
-cp hooks.d/*.py $STASH_HOME/external-hooks/hooks.d
-chmod +x $STASH_HOME/external-hooks/githooks.py
-chmod +x $STASH_HOME/external-hooks/hooks.d/*.py
-# Copy hook configuration files
-cp githooks.ini $STASH_HOME/external-hooks
-cp `pwd`/pre-receive.conf.sample $STASH_HOME/external-hooks/conf/$STASH_PROJECT_KEY/$STASH_REPO_NAME/pre-receive.conf
-cp `pwd`/post-receive.conf.sample $STASH_HOME/external-hooks/conf/$STASH_PROJECT_KEY/$STASH_REPO_NAME/post-receive.conf
 
 # Init a remote repo.
 mkdir $test_root/remote_repo.git
+
+root_dir=$test_root/remote_repo.git/hooks
+conf_dir=$root_dir/conf
+hooks_dir=$root_dir/hooks.d
+
 git init --bare $test_root/remote_repo.git
 
-echo '#!/bin/bash' > $test_root/remote_repo.git/hooks/pre-receive
-echo "$STASH_HOME/external-hooks/githooks.py $STASH_PROJECT_KEY/$STASH_REPO_NAME/pre-receive.conf < /dev/stdin" >> $test_root/remote_repo.git/hooks/pre-receive
-chmod +x $test_root/remote_repo.git/hooks/pre-receive
+mkdir -p $conf_dir
+mkdir -p $hooks_dir
 
-echo '#!/bin/bash' > $test_root/remote_repo.git/hooks/post-receive
-echo "$STASH_HOME/external-hooks/githooks.py $STASH_PROJECT_KEY/$STASH_REPO_NAME/post-receive.conf < /dev/stdin" >> $test_root/remote_repo.git/hooks/post-receive
-chmod +x $test_root/remote_repo.git/hooks/post-receive
+
+# Deploy githooks.
+cp githooks.py $root_dir
+cp hooks.d/*.py $hooks_dir
+chmod +x $root_dir/githooks.py
+chmod +x $hooks_dir/*.py
+
+# Create githooks.ini
+cat >$root_dir/githooks.ini <<EOL
+[restrict_branches]
+user_name = %(USER)s
+
+[notify]
+user_name = %(USER)s
+base_url = http://STASH
+proj_key = TEST
+repo_name = test
+
+smtp_server = aspmx.l.google.com
+smtp_port = 25
+smtp_from =
+EOL
+
+# Copy hook configuration files.
+cp `pwd`/pre-receive.conf.sample $conf_dir/pre-receive.conf
+cp `pwd`/post-receive.conf.sample $conf_dir/post-receive.conf
+
+echo '#!/bin/bash' > $root_dir/pre-receive
+echo "$root_dir/githooks.py pre-receive.conf < /dev/stdin" >> $root_dir/pre-receive
+chmod +x $root_dir/pre-receive
+
+echo '#!/bin/bash' > $root_dir/post-receive
+echo "$root_dir/githooks.py post-receive.conf < /dev/stdin" >> $root_dir/post-receive
+chmod +x $root_dir/post-receive
+
 
 # Init a local repo.
 mkdir $test_root/repo

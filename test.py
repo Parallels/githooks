@@ -93,17 +93,8 @@ class TestBase(unittest.TestCase):
         self.remote_repo = os.path.join(self.base, 'remote_repo.git')
         self.repo = os.path.join(self.base, 'repo')
 
-        os.environ['BITBUCKET_HOME'] = os.path.join(self.base, 'stash')
-        os.environ['STASH_USER_NAME'] = os.environ['USER']
-        os.environ['STASH_BASE_URL'] = 'https://STASH'
-        os.environ['STASH_PROJECT_KEY'] = 'TEST'
-        os.environ['STASH_REPO_NAME'] = 'unittest'
-
-        conf_dir = os.path.join(os.environ['BITBUCKET_HOME'], 'external-hooks', 'conf')
-        os.makedirs(conf_dir)
-
-        # Create test.conf
-        with open(os.path.join(conf_dir, 'test.conf'), 'w') as f:
+        # Create tmp/test.conf
+        with open(os.path.join(self.base, 'test.conf'), 'w') as f:
             f.write(json.dumps({"restrict_branches":[],
                                 "line_endings":[],
                                 "py_indent":[],
@@ -380,6 +371,8 @@ class TestRestrictBranches(TestBase):
         self.write_response(0, 'success')
         git_async_result(git_call)
 
+        hook_user = hook.params['user_name']
+
         # Now mary tries to create branch 'release/another'
         git_call = git_async(['push', '-u', 'origin', 'master:release/another'], self.repo)
         request = self.get_request()
@@ -395,7 +388,7 @@ class TestRestrictBranches(TestBase):
 
         git_call = git_async(['push', '-u', 'origin', 'master:release/another'], self.repo)
         request = self.get_request()
-        hook.params['user_name'] = os.environ['STASH_USER_NAME']
+        hook.params['user_name'] = hook_user
         self.assertFalse(hook.check(request[0], request[1], request[2])[0])
         self.write_response(0, 'success')
         git_async_result(git_call)
@@ -408,7 +401,7 @@ class TestRestrictBranches(TestBase):
         git_call = git_async(['push', '-u', 'origin', 'master:release/another'], self.repo)
         hook.params['user_name'] = "john"
         self.assertTrue(hook.check(request[0], request[1], request[2])[0])
-        hook.params['user_name'] = os.environ['STASH_USER_NAME']
+        hook.params['user_name'] = hook_user
         self.write_response(0, 'success')
         git_async_result(git_call)
 
@@ -748,8 +741,13 @@ class TestDenyNonFf(TestBase):
 
         self.assertFalse(permit)
         self.assertTrue(len(messages) == 1)
-        self.assertTrue(messages[0]['text'] == 'Cannot push a non-fast-forward reference')
-
+        self.assertTrue(messages[0]['text'].split('\n') == [
+            "Cannot push a non-fast-forward reference",
+            "Updates were rejected because the tip of your current branch is behind",
+            "its remote counterpart. Integrate the remote changes (e.g.",
+            "'git pull ...') before pushing again.",
+            "See the 'Note about fast-forwards' in 'git push --help' for details."
+        ])
         self.write_response(0, 'success')
         git_async_result(git_call)
 

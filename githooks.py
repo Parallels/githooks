@@ -28,38 +28,6 @@ import fileinput
 import logging
 
 
-def configure_defaults():
-    '''
-    Validate Stash and external-hooks plugin environment required
-    to run the hooks. Configure default githooks source layout.
-
-    Note: these values can be overriden by values in DEFAULT section
-    of githooks.ini.
-    '''
-    params = {}
-    try:
-        # STASH_HOME for Atlassian Stash (ver < 4)
-        # BITBUCKET_HOME for Atlassian Bitbucket Server (rebranded Stash ver >= 4)
-        if 'BITBUCKET_HOME' in os.environ:
-            params['stash_home'] = os.environ['BITBUCKET_HOME']
-        else:
-            params['stash_home'] = os.environ['STASH_HOME']
-        # These environment variables come from External Hooks plugin
-        params['user_name'] = os.environ['STASH_USER_NAME']
-        params['base_url'] = os.environ['STASH_BASE_URL']
-        params['proj_key'] = os.environ['STASH_PROJECT_KEY']
-        params['repo_name'] = os.environ['STASH_REPO_NAME']
-    except KeyError as key:
-        raise RuntimeError("%s not in env" % key)
-
-    params['log_file'] = os.path.join(params['stash_home'], 'log', 'atlassian-stash-githooks.log')
-    params['root_dir'] = os.path.join(params['stash_home'], 'external-hooks')
-    params['conf_dir'] = os.path.join(params['root_dir'], 'conf')
-    params['hooks_dir'] = os.path.join(params['root_dir'], 'hooks.d')
-
-    return params
-
-
 class Githooks(object):
     '''
     Initialize and run githooks.
@@ -67,12 +35,8 @@ class Githooks(object):
     def __init__(self, conf_file, ini_file, repo_dir=os.getcwd()):
         self.this_file_path = os.path.dirname(unicode(__file__, sys.getfilesystemencoding()))
 
-        self.params = configure_defaults()
-
         self.ini = self.__load_ini_file(ini_file)
-        # Override default params
-        if self.ini.defaults():
-            self.params.update(dict(self.ini.defaults()))
+        self.configure_defaults()
 
         # Set up logging
         logging.basicConfig(format='%(asctime)s %(levelname)s [%(filename)s:%(lineno)d] %(message)s',
@@ -86,6 +50,27 @@ class Githooks(object):
 
         sys.path.append(self.params['hooks_dir'])
         self.hooks = self.load()
+
+    def configure_defaults(self):
+        '''
+        Configure githooks layout.
+        '''
+        root_dir = self.this_file_path
+
+        try:
+            defaults = dict(self.ini.items('DEFAULT'))
+
+            if not 'log_file' in defaults:
+                defaults['log_file'] = os.path.join(root_dir, 'githooks.log')
+            if not 'conf_dir' in defaults:
+                defaults['conf_dir'] = os.path.join(root_dir, 'conf')
+            if not 'hooks_dir' in defaults:
+                defaults['hooks_dir'] = os.path.join(root_dir, 'hooks.d')
+
+            self.params = defaults
+
+        except ConfigParser.Error as err:
+            raise RuntimeError("Could not load default settings from .ini: %s" % str(err))
 
     def __load_conf_file(self, conf_file):
         '''
@@ -111,14 +96,13 @@ class Githooks(object):
         '''
         ini_dir = self.this_file_path
 
-        ini = ConfigParser.SafeConfigParser()
+        ini = ConfigParser.SafeConfigParser(os.environ)
 
         ini_path = os.path.join(ini_dir, ini_file)
         try:
             with open(ini_path) as f:
                 ini.readfp(f)
         except IOError as err:
-            logging.error(str(err))
             raise RuntimeError(str(err))
 
         return ini
