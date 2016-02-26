@@ -44,7 +44,7 @@ class Githooks(object):
                             filename=self.params['log_file'])
 
         self.repo_dir = repo_dir
-        logging.debug("In '%s'", self.repo_dir)
+        logging.debug("In: '%s'", self.repo_dir)
 
         self.conf = self.__load_conf_file(conf_file)
 
@@ -123,8 +123,9 @@ class Githooks(object):
             # Load hook specific environment from githooks .ini
             try:
                 hook_params.update(dict(ini.items(hook)))
-            except Exception as err:
-                logging.debug(str(err))
+                logging.debug("Updated %s settings", hook)
+            except ConfigParser.Error:
+                pass
 
             # Load the hooks from hooks_dir
             try:

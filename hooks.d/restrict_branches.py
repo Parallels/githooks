@@ -56,10 +56,15 @@ class Hook(object):
         self.params = params
 
     def check(self, branch, old_sha, new_sha):
-        logging.debug("branch='%s', old_sha='%s', new_sha='%s', params='%s'",
-                      branch, old_sha, new_sha, self.params)
+        logging.debug("Run: branch=%s, old_sha=%s, new_sha=%s",
+                      branch, old_sha, new_sha)
+        logging.debug("params=%s", self.params)
 
-        pusher = self.params['user_name']
+        try:
+            pusher = self.params['user_name']
+        except KeyError as err:
+            logging.error("%s not in hook settings", err)
+            raise RuntimeError("%s not in hook settings, check githooks configuration" % err)
 
         permit = False
 
@@ -106,12 +111,13 @@ class Hook(object):
             pusher_match = user_re.match(pusher)
 
             if not branch_match:
-                logging.debug("Branch '%s' does not match '%s', skip", branch, rule['branch'])
                 continue
 
             if not pusher_match:
-                logging.debug("Pusher '%s' does not match '%s', skip", pusher, rule['user'])
                 continue
+
+            logging.debug("Branch %s matches %s", branch, rule['branch'])
+            logging.debug("Pusher %s matches %s", pusher, rule['user'])
 
             if is_new_branch and rule_type == 'create':
                 if policy == 'allow':
@@ -125,7 +131,7 @@ class Hook(object):
                 elif policy == 'deny':
                     permit = False
 
-            logging.debug("is_new_branch='%s', rule_type='%s', policy='%s', permit='%s'",
+            logging.debug("is_new_branch=%s, rule_type=%s, policy=%s, permit=%s",
                           is_new_branch, rule_type, policy, permit)
 
         messages = []
@@ -134,5 +140,7 @@ class Hook(object):
             rule_type = 'create' if is_new_branch else 'update'
             messages.append({'at': new_sha,
                 'text': "Error: You have no permission to %s %s" % (rule_type, branch)})
+
+        logging.debug("Permit: %s", permit)
 
         return permit, messages

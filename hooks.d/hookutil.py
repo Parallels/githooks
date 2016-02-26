@@ -30,7 +30,6 @@ def run(cmd, exec_dir=os.getcwd(), env=None, check_ret=True):
     Execute a command in 'exec_dir' directory.
     '''
     log_cmd = ' '.join(cmd[:10] + [" ... (cut %s)" % (len(cmd)-10)] if len(cmd) > 10 else cmd)
-    logging.debug("Run: '%s'", log_cmd)
 
     proc = subprocess.Popen(cmd,
                             stdout=subprocess.PIPE,
@@ -81,7 +80,7 @@ def get_attr(repo_dir, new_sha, filename, attr):
     chunks = [c.strip() for c in out.split(':')]
     assert chunks[0] == filename
     assert chunks[1] == attr
-    logging.debug("filename='%s', %s='%s'", filename, attr, chunks[2])
+    logging.debug("filename=%s, git attr %s=%s", filename, attr, chunks[2])
 
     return chunks[2]
 
@@ -146,7 +145,7 @@ def parse_git_log(repo, branch, old_sha, new_sha):
     _, log, _ = run(cmd, repo)
 
     if not log:
-        logging.debug("Empty git log")
+        logging.debug("parse_git_log: empty log")
         return {}
 
     log = log.strip('\n\x1e').split("\x1e")
@@ -154,7 +153,7 @@ def parse_git_log(repo, branch, old_sha, new_sha):
     log = [dict(zip(git_commit_fields, row)) for row in log]
 
     for raw in log:
-        logging.debug("Parsed row: '%s'", raw)
+        logging.debug("Parsed commit: %s", raw)
 
     return log
 
@@ -199,7 +198,7 @@ def parse_git_show(repo, sha, extensions=None):
         path = match.group(4)
         if extension_match(path, extensions):
             show_json.append(dict(zip(git_show_fields, match.groups())))
-            logging.debug("Parsed row: '%s'", show_json[-1])
+            logging.debug("Parsed modfile: %s", show_json[-1])
 
     return show_json
 
@@ -214,7 +213,7 @@ def send_mail(mail_to, smtp_from, subject, smtp_server, smtp_port):
     subject: subject line, common for all mails
     '''
     if not mail_to:
-        logging.debug('No mails to send, mail_to empty')
+        logging.debug('No mails to send (send_mail)')
         return
 
     logging.debug("Connecting to the server '%s:%s'", smtp_server, smtp_port)

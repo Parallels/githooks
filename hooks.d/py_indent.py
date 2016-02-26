@@ -25,8 +25,10 @@ class Hook(object):
         self.params = params
 
     def check(self, branch, old_sha, new_sha):
-        logging.debug("branch='%s', old_sha='%s', new_sha='%s', params='%s'",
-                      branch, old_sha, new_sha, self.params)
+        logging.debug("Run: branch=%s, old_sha=%s, new_sha=%s",
+                      branch, old_sha, new_sha)
+        logging.debug("params=%s", self.params)
+
         permit = True
 
         # Do not run the hook if the branch is being deleted
@@ -69,12 +71,15 @@ class Hook(object):
                 cmd = ['git', 'show', modfile['new_blob']]
                 _, file_contents, _ = hookutil.run(cmd, self.repo_dir)
 
-                permit_py_indent = not has_mixed_indent(file_contents)
-                if not permit_py_indent:
+                permit_file = not has_mixed_indent(file_contents)
+                logging.debug("modfile=%s, permit_file=%s", modfile['path'], permit_file)
+
+                if not permit_file:
                     messages.append({'at': commit['commit'],
                         'text': "Error: file '%s' has mixed indentation" % modfile['path']})
 
-                permit = permit and permit_py_indent
-                logging.debug("modfile='%s', permit='%s'", modfile['path'], permit)
+                permit = permit and permit_file
+
+        logging.debug("Permit: %s", permit)
 
         return permit, messages

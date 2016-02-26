@@ -42,13 +42,17 @@ class Hook(object):
         return True
 
     def check(self, branch, old_sha, new_sha):
-        logging.debug("branch='%s', old_sha='%s', new_sha='%s', params='%s'",
-                      branch, old_sha, new_sha, self.params)
+        logging.debug("Run: branch=%s, old_sha=%s, new_sha=%s",
+                      branch, old_sha, new_sha)
+        logging.debug("params=%s", self.params)
+
+        permit = True
+        messages = []
 
         # Do not run the hook if the branch is being deleted
         if new_sha == '0' * 40:
             logging.debug("Deleting the branch, skip the hook")
-            return True, []
+            return permit, messages
 
         # Check if branch matches any of the list
         for branch_re in self.settings:
@@ -59,18 +63,20 @@ class Hook(object):
                 continue
 
             if branch_rec.match(branch):
-                logging.debug("Matched '%s'", branch_re)
+                logging.debug("Matched: %s", branch_re)
+
                 permit = self.is_ff_push(old_sha, new_sha)
-                if not permit:
-                    hint = '\n'.join(['',
-                        "Updates were rejected because the tip of your current branch is behind",
-                        "its remote counterpart. Integrate the remote changes (e.g.",
-                        "'git pull ...') before pushing again.",
-                        "See the 'Note about fast-forwards' in 'git push --help' for details."
-                    ])
-                    return permit, [{'at': new_sha, 'text': "Cannot push a non-fast-forward reference." + hint}]
-                return permit, []
+                break
 
-        logging.debug("Branch '%s' does not match any of '%s', skip", branch, ' | '.join(self.settings))
+        if not permit:
+            hint = '\n'.join(['',
+                "Updates were rejected because the tip of your current branch is behind",
+                "its remote counterpart. Integrate the remote changes (e.g.",
+                "'git pull ...') before pushing again.",
+                "See the 'Note about fast-forwards' in 'git push --help' for details."
+            ])
+            messages.append({'at': new_sha, 'text': 'Cannot push a non-fast-forward reference' + hint})
 
-        return True, []
+        logging.debug("Permit: %s", permit)
+
+        return permit, messages

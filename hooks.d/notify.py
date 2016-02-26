@@ -85,15 +85,20 @@ class Hook(object):
         return mails
 
     def check(self, branch, old_sha, new_sha):
-        logging.debug("branch='%s', old_sha='%s', new_sha='%s', params='%s'",
-                      branch, old_sha, new_sha, self.params)
+        logging.debug("Run: branch=%s, old_sha=%s, new_sha=%s",
+                      branch, old_sha, new_sha)
+        logging.debug("params=%s", self.params)
 
-        pusher = self.params['user_name']
-        proj_key = self.params['proj_key']
-        repo_name = self.params['repo_name']
-        smtp_server = self.params['smtp_server']
-        smtp_port = self.params['smtp_port']
-        smtp_from = self.params['smtp_from']
+        try:
+            pusher = self.params['user_name']
+            proj_key = self.params['proj_key']
+            repo_name = self.params['repo_name']
+            smtp_server = self.params['smtp_server']
+            smtp_port = self.params['smtp_port']
+            smtp_from = self.params['smtp_from']
+        except KeyError as err:
+            logging.error("%s not in hook settings", err)
+            raise RuntimeError("%s not in hook settings, check githooks configuration" % err)
 
         # Do not run the hook if the branch is being deleted
         if new_sha == '0' * 40:
@@ -109,7 +114,7 @@ class Hook(object):
                 continue
 
             if branch_rec.match(branch):
-                logging.debug("Matched '%s'", branch_re)
+                logging.debug("Matched: %s", branch_re)
                 mails = self.compose_mail(branch, old_sha, new_sha)
                 hookutil.send_mail(mails, smtp_from,
                     "%s/%s - Hook notify: Files you subscribed to were modified" % (proj_key, repo_name),
@@ -117,6 +122,6 @@ class Hook(object):
 
                 return True, []
 
-        logging.debug("Branch '%s' does not match any of '%s', skip", branch, ' | '.join(self.settings))
+        logging.debug("Branch %s does not match any of %s, skip the hook", branch, ', '.join(self.settings))
 
         return True, []

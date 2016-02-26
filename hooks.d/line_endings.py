@@ -25,8 +25,10 @@ class Hook(object):
         self.params = params
 
     def check(self, branch, old_sha, new_sha):
-        logging.debug("branch='%s', old_sha='%s', new_sha='%s', params='%s'",
-                      branch, old_sha, new_sha, self.params)
+        logging.debug("Run: branch=%s, old_sha=%s, new_sha=%s",
+                      branch, old_sha, new_sha)
+        logging.debug("params=%s", self.params)
+
         permit = True
 
         # Do not run the hook if the branch is being deleted
@@ -56,7 +58,7 @@ class Hook(object):
             for modfile in modfiles:
                 # Skip deleted files
                 if modfile['status'] == 'D':
-                    logging.debug("Deleted '%s', skip", modfile['path'])
+                    logging.debug("Deleted %s, skip", modfile['path'])
                     continue
 
                 binary_attr = hookutil.get_attr(
@@ -67,12 +69,14 @@ class Hook(object):
                     _, file_contents, _ = hookutil.run(cmd, self.repo_dir)
 
                     permit_file = not has_mixed_le(file_contents)
+                    logging.debug("modfile='%s', permit_file='%s'", modfile['path'], permit_file)
+
                     if not permit_file:
                         messages.append({'at': commit['commit'],
                             'text': "Error: file '%s' has mixed line endings (CRLF/LF)" % modfile['path']})
 
                     permit = permit and permit_file
 
-                logging.debug("modfile='%s', permit='%s'", modfile['path'], permit)
+        logging.debug("Permit: %s", permit)
 
         return permit, messages
