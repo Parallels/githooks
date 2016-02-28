@@ -118,7 +118,7 @@ class Githooks(object):
 
         hooks = []
         for hook in conf:
-            hook_params = params
+            hook_params = params.copy()
 
             # Load hook specific environment from githooks .ini
             try:
