@@ -99,7 +99,8 @@ class TestBase(unittest.TestCase):
                                 "line_endings":[],
                                 "py_indent":[],
                                 "notify":[],
-                                "deny_non_ff":[]},
+                                "deny_non_ff":[],
+                                "email_mention":[]},
                                 indent=4))
 
         gh = githooks.Githooks(conf_file='test.conf', ini_file='testhooks.ini',
@@ -748,6 +749,149 @@ class TestDenyNonFf(TestBase):
             "'git pull ...') before pushing again.",
             "See the 'Note about fast-forwards' in 'git push --help' for details."
         ])
+        self.write_response(0, 'success')
+        git_async_result(git_call)
+
+
+class TestEmailMention(TestBase):
+    '''
+    Test email_mention hook.
+    '''
+    def test_compose_mail_simple(self):
+        '''
+        Test simpliest commit message:
+
+        Some feature.
+        @somebody
+
+        '''
+        write_string('a.txt', 'data')
+        git(['add', 'a.txt'])
+        git(['commit', '-m', 'Some feature.\n@somebody'])
+
+        git_call = git_async(['push', '-u', 'origin', 'master'], self.repo)
+        request = self.get_request()
+
+        hook = self.hooks["email_mention"]
+        mails = hook.compose_mail(request[0], request[1], request[2])
+
+        self.assertTrue(len(mails) == 1)
+        self.assertTrue('somebody@gmail.com' in mails)
+
+        self.write_response(0, 'success')
+        git_async_result(git_call)
+
+    def test_compose_mail_dot_end(self):
+        '''
+        Test dot in the end of username:
+
+        Some feature.
+        CC @somebody.
+
+        '''
+        write_string('a.txt', 'data')
+        git(['add', 'a.txt'])
+        git(['commit', '-m', 'Some feature.\nCC @somebody.'])
+
+        git_call = git_async(['push', '-u', 'origin', 'master'], self.repo)
+        request = self.get_request()
+
+        hook = self.hooks["email_mention"]
+        mails = hook.compose_mail(request[0], request[1], request[2])
+
+        self.assertTrue(len(mails) == 1)
+        self.assertTrue('somebody@gmail.com' in mails)
+
+        self.write_response(0, 'success')
+        git_async_result(git_call)
+
+    def test_compose_mail_mention_at_begin(self):
+        '''
+        Test in the beginning of commit message:
+
+        @somebody check it
+
+        '''
+        write_string('a.txt', 'data')
+        git(['add', 'a.txt'])
+        git(['commit', '-m', '@somebody check it'])
+
+        git_call = git_async(['push', '-u', 'origin', 'master'], self.repo)
+        request = self.get_request()
+
+        hook = self.hooks["email_mention"]
+        mails = hook.compose_mail(request[0], request[1], request[2])
+
+        self.assertTrue(len(mails) == 1)
+        self.assertTrue('somebody@gmail.com' in mails)
+
+        self.write_response(0, 'success')
+        git_async_result(git_call)
+
+    def test_compose_mail_many_mentions(self):
+        '''
+        Test a list of usernames:
+
+        Some feature @somebody,@andmore
+
+        '''
+        write_string('a.txt', 'data')
+        git(['add', 'a.txt'])
+        git(['commit', '-m', 'Some feature @somebody,@andmore'])
+
+        git_call = git_async(['push', '-u', 'origin', 'master'], self.repo)
+        request = self.get_request()
+
+        hook = self.hooks["email_mention"]
+        mails = hook.compose_mail(request[0], request[1], request[2])
+
+        self.assertTrue(len(mails) == 2)
+        self.assertTrue('somebody@gmail.com' in mails)
+        self.assertTrue('andmore@gmail.com' in mails)
+
+        self.write_response(0, 'success')
+        git_async_result(git_call)
+
+    def test_compose_mail_many_mentions_and_commits(self):
+        '''
+        Test composing mails across several commits.
+        '''
+        write_string('a.txt', 'data')
+        git(['add', 'a.txt'])
+        git(['commit', '-m', 'Some feature @somebody'])
+        write_string('a.txt', 'newdata')
+        git(['add', 'a.txt'])
+        git(['commit', '-m', 'Some feature @somebody @andmore.'])
+
+        git_call = git_async(['push', '-u', 'origin', 'master'], self.repo)
+        request = self.get_request()
+
+        hook = self.hooks["email_mention"]
+        mails = hook.compose_mail(request[0], request[1], request[2])
+
+        self.assertTrue(len(mails) == 2)
+        self.assertTrue('somebody@gmail.com' in mails)
+        self.assertTrue('andmore@gmail.com' in mails)
+
+        self.write_response(0, 'success')
+        git_async_result(git_call)
+
+    def test_compose_mail_mention_email(self):
+        '''
+        Test do not parse email addresses.
+        '''
+        write_string('a.txt', 'data')
+        git(['add', 'a.txt'])
+        git(['commit', '-m', 'Some feature somebody@gmail.com'])
+
+        git_call = git_async(['push', '-u', 'origin', 'master'], self.repo)
+        request = self.get_request()
+
+        hook = self.hooks["email_mention"]
+        mails = hook.compose_mail(request[0], request[1], request[2])
+
+        self.assertTrue(len(mails) == 0)
+
         self.write_response(0, 'success')
         git_async_result(git_call)
 

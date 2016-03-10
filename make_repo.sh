@@ -51,6 +51,18 @@ repo_name = test
 smtp_server = aspmx.l.google.com
 smtp_port = 25
 smtp_from =
+
+[email_mention]
+user_name = %(USER)s
+base_url = http://STASH
+proj_key = TEST
+repo_name = test
+
+smtp_server = aspmx.l.google.com
+smtp_port = 25
+smtp_from =
+
+email_domain = gmail.com
 EOL
 
 # Copy hook configuration files.

@@ -220,6 +220,18 @@ Date: <commit date>
 Commit: ...
 ```
 
+* __email_mention__ (notify users mentioned in commit messages)
+
+Reports commits to users mentioned in commit messages as @username.
+`git ci -m 'My cool new feature @someone'` to send this commit to
+someone@domain. Domain is specified in githooks.ini.
+
+Settings format: None, always runs with an empty list []
+
+Report format: similar to __notify__'s report, but commit messages
+left untrimmed and does not contain lists of modified files.
+
+
 ## Requirements
 
 * [Atlassian Stash/Bitbucket Server](https://www.atlassian.com/software/bitbucket/server)
