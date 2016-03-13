@@ -31,19 +31,28 @@ def run(cmd, exec_dir=os.getcwd(), env=None, check_ret=True):
     '''
     log_cmd = ' '.join(cmd[:10] + [" ... (cut %s)" % (len(cmd)-10)] if len(cmd) > 10 else cmd)
 
-    proc = subprocess.Popen(cmd,
-                            stdout=subprocess.PIPE,
-                            stderr=subprocess.PIPE,
-                            cwd=exec_dir,
-                            env=env)
-    out, err = proc.communicate()
-    ret = proc.returncode
+    with tempfile.TemporaryFile() as out_fd:
+        with tempfile.TemporaryFile() as err_fd:
 
-    if check_ret and ret != 0:
-        logging.error("Command '%s' returned non-zero exit status %s", log_cmd, ret)
-        raise subprocess.CalledProcessError(ret, log_cmd)
+            proc = subprocess.Popen(cmd,
+                                    stdout=out_fd,
+                                    stderr=err_fd,
+                                    cwd=exec_dir,
+                                    env=env)
+            ret = proc.wait()
 
-    return ret, out, err
+            out_fd.seek(0)
+            out = out_fd.read()
+
+            err_fd.seek(0)
+            err = err_fd.read()
+
+            if check_ret and ret != 0:
+                logging.error("Command '%s' returned non-zero exit status %s (%s)",
+                              log_cmd, ret, err)
+                raise subprocess.CalledProcessError(ret, log_cmd)
+
+            return ret, out, err
 
 
 def git_empty_tree():
