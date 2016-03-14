@@ -140,7 +140,7 @@ def parse_git_log(repo, branch, old_sha, new_sha):
     if branch in refs:
         refs.remove(branch)
 
-    cmd = ['git', 'log', '--format=' + git_log_format]
+    cmd = ['git', 'log', '--ignore-missing', '--format=' + git_log_format]
     if old_sha == '0' * 40:
         # It's a new branch
         cmd += [new_sha]
