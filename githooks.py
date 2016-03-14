@@ -96,7 +96,12 @@ class Githooks(object):
         '''
         ini_dir = self.this_file_path
 
-        ini = ConfigParser.SafeConfigParser(os.environ)
+        # FIXME python 2.6's ConfigParser fails to interpolate '%s'
+        # Caught at LESSOPEN=|/usr/bin/lesspipe.sh %s in os.environ
+        # ini = ConfigParser.SafeConfigParser(os.environ)
+        env = dict([(k, os.environ[k]) for k in os.environ
+                    if k.startswith('STASH_') or k.startswith('BITBUCKET_') or k == 'USER'])
+        ini = ConfigParser.SafeConfigParser(env)
 
         ini_path = os.path.join(ini_dir, ini_file)
         try:
