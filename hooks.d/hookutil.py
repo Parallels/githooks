@@ -73,13 +73,14 @@ def get_attr(repo_dir, new_sha, filename, attr):
     '''
     idx_file = tempfile.mkstemp(suffix='git_index')[1]
 
-    # Create an index from new_sha.
-    cmd = ['git', 'read-tree', new_sha, '--index-output', idx_file]
-    run(cmd, repo_dir)
-
-    # Get the attr only from the index.
     env = os.environ.copy()
     env['GIT_INDEX_FILE'] = idx_file
+
+    # Create an index from new_sha.
+    cmd = ['git', 'read-tree', new_sha]
+    run(cmd, repo_dir, env)
+
+    # Get the attr only from the index.
     cmd = ['git', 'check-attr', '--cached', attr, '--', filename]
     _, out, _ = run(cmd, repo_dir, env)
 
