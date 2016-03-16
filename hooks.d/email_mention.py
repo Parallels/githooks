@@ -46,7 +46,7 @@ class Hook(object):
 
         users = []
         for commit in log:
-            for username in re.findall('(?:\W+|^)@(\w[\w\.]*\w|\w)', commit['message']):
+            for username in set(re.findall('(?:\W+|^)@(\w[\w\.]*\w|\w)', commit['message'])):
                 ci = commit.copy()
                 ci.update({'user': username})
                 users.append(ci)
