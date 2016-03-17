@@ -29,10 +29,12 @@ class Hook(object):
         '''
         Check if new_sha is a fast-forward reference.
         '''
+        cmd = ['git', 'rev-list']
         if old_sha == '0' * 40:
-            old_sha = hookutil.git_empty_tree()
+            cmd += [new_sha]
+        else:
+            cmd += ["%s..%s" % (new_sha, old_sha)]
 
-        cmd = ['git', 'rev-list', "%s..%s" % (new_sha, old_sha)]
         _, refs, _ = hookutil.run(cmd, self.repo_dir)
 
         # It is a non-fast-forward push
