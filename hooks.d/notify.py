@@ -52,8 +52,10 @@ class Hook(object):
                 owners_attr = hookutil.get_attr(self.repo_dir, new_sha, modfile['path'], 'owners')
                 if owners_attr == 'unspecified' or owners_attr == 'unset':
                     continue
-                for owner in owners_attr.split(','):
+                for owner in set(owners_attr.split(',')):
                     files.append({'owner':owner, 'commit':commit, 'path':modfile})
+
+        files = sorted(files, key=lambda ko: ko['owner'])
 
         mails = {}
         for owner, commits in itertools.groupby(files, key=lambda ko: ko['owner']):
@@ -61,6 +63,7 @@ class Hook(object):
             text += '<b>By user:</b> %s\n' % pusher
             text += '\n'
 
+            # No need to sort by commit hash because it is in order
             for commit, paths in itertools.groupby(commits, key=lambda kc: kc['commit']):
                 link = base_url + \
                     "/projects/%s/repos/%s/commits/%s\n" % (proj_key, repo_name, commit['commit'])
