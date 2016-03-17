@@ -553,84 +553,6 @@ class TestNotify(TestBase):
         self.write_response(0, 'success')
         git_async_result(git_call)
 
-    def test_only_new_commits(self):
-        write_string('a.txt', 'data')
-        git(['add', 'a.txt'])
-        git(['commit', '-m', 'initial commit'])
-        git_call = git_async(['push', '-u', 'origin', 'master:one'], self.repo)
-        self.get_request()
-        self.write_response(0, 'success')
-        git_async_result(git_call)
-
-        write_string('b.txt', 'data')
-        git(['add', 'b.txt'])
-        git(['commit', '-m', 'second commit'])
-        git_call = git_async(['push', '-u', 'origin', 'master:two'], self.repo)
-        self.get_request()
-        self.write_response(0, 'success')
-        git_async_result(git_call)
-
-        write_string('b.txt', 'dat')
-        write_string('.gitattributes', '*.txt owners=%s' % 'somebody@gmail.com')
-        git(['add', 'b.txt', '.gitattributes'])
-        git(['commit', '-m', 'third commit'])
-        git_call = git_async(['push', '-u', 'origin', 'master'], self.repo)
-        request = self.get_request()
-
-        hook = self.hooks["notify"]
-        owners = hook.compose_mail(request[0], request[1], request[2])
-
-        self.assertTrue('somebody@gmail.com' in owners)
-        self.assertTrue(len(owners) == 1)
-        text = owners['somebody@gmail.com']
-        self.assertTrue('third commit' in text)
-        self.assertTrue('M  b.txt' in text)
-        self.assertFalse('initial commit' in text)
-        self.assertFalse('second commit' in text)
-
-        self.write_response(0, 'success')
-        git_async_result(git_call)
-
-        write_string('c.txt', 'dat')
-        git(['add', 'c.txt'])
-        git(['commit', '-m', 'forth commit'])
-        git_call = git_async(['push', '-u', 'origin', 'master'], self.repo)
-        request = self.get_request()
-
-        owners = hook.compose_mail(request[0], request[1], request[2])
-
-        self.assertTrue('somebody@gmail.com' in owners)
-        text = owners['somebody@gmail.com']
-        self.assertTrue('forth commit' in text)
-        self.assertTrue('A  c.txt' in text)
-        self.assertFalse('initial commit' in text)
-        self.assertFalse('second commit' in text)
-        self.assertFalse('third commit' in text)
-
-        self.write_response(0, 'success')
-        git_async_result(git_call)
-
-    def test_no_new_commits(self):
-        write_string('a.txt', 'data')
-        write_string('.gitattributes', 'a.txt owners=somebody@gmail.com')
-        git(['add', 'a.txt', '.gitattributes'])
-        git(['commit', '-m', 'initial commit'])
-        git_call = git_async(['push', '-u', 'origin', 'master'], self.repo)
-        self.get_request()
-        self.write_response(0, 'success')
-        git_async_result(git_call)
-
-        git_call = git_async(['push', '-u', 'origin', 'master:one'], self.repo)
-        request = self.get_request()
-
-        hook = self.hooks["notify"]
-        owners = hook.compose_mail(request[0], request[1], request[2])
-
-        self.assertTrue(owners == {})
-
-        self.write_response(0, 'success')
-        git_async_result(git_call)
-
     def test_merge_commit(self):
         write_string('a.txt', 'data')
         git(['add', 'a.txt'])
@@ -672,6 +594,58 @@ class TestNotify(TestBase):
         git_async_result(git_call)
 
     def test_successful_hook(self):
+        write_string('a.txt', 'data')
+        write_string('.gitattributes', '*.txt owners=somebody,andmore')
+        git(['add', 'a.txt', '.gitattributes'])
+        git(['commit', '-m', 'initial commit'])
+        git_call = git_async(['push', '-u', 'origin', 'master'], self.repo)
+        self.get_request()
+        self.write_response(0, 'success')
+        git_async_result(git_call)
+
+        git(['checkout', '-b', 'feature/test'])
+        write_string('a.txt', 'newdata')
+        git(['add', 'a.txt'])
+        git(['commit', '-m', 'update a.txt'])
+        write_string('c.txt', 'data')
+        write_string('a.txt', 'againnewdata')
+        git(['add', 'c.txt', 'a.txt'])
+        git(['commit', '-m', 'create c.txt, update a.txt'])
+        git_call = git_async(['push', '-u', 'origin', 'feature/test'], self.repo)
+        self.get_request()
+        self.write_response(0, 'success')
+        git_async_result(git_call)
+
+        git(['checkout', 'master'])
+        write_string('b.txt', 'data')
+        git(['add', 'b.txt'])
+        git(['commit', '-m', 'create b.txt'])
+
+        git(['merge', 'feature/test'])
+
+        git_call = git_async(['push', '-u', 'origin', 'master'], self.repo)
+        request = self.get_request()
+
+        hook = self.hooks["notify"]
+        hook.settings = [
+            "refs/heads/master"
+        ]
+        owners = hook.compose_mail(request[0], request[1], request[2])
+
+        self.assertTrue('somebody' in owners)
+        text = owners['somebody']
+        self.assertTrue('andmore' in owners)
+        self.assertTrue(text == owners['andmore'])
+
+        self.assertTrue("Merge branch 'feature/test'\n\n\tM  a.txt\n\tA  c.txt" in text)
+        self.assertTrue("create b.txt\n\n\tA  b.txt" in text)
+        self.assertTrue("create c.txt, update a.txt\n\n\tM  a.txt\n\tA  c.txt" in text)
+        self.assertTrue("update a.txt\n\n\tM  a.txt" in text)
+
+        self.write_response(0, 'success')
+        git_async_result(git_call)
+
+    def test_successful_hook_send(self):
         hook = self.hooks["notify"]
         assert hook.params['smtp_from'], 'please configure smtp_from to run this test'
 

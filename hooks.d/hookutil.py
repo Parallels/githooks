@@ -95,17 +95,19 @@ class Memoized(object):
     def __init__(self, function):
         self.function = function
         self.memoized = {}
-    def __call__(self, *args):
+    def __call__(self, *args, **kwargs):
+        key = args + tuple(kwargs.values())
         try:
-            return self.memoized[args]
+            logging.debug("Retreiving memoized %s %s %s", self.function, args, kwargs)
+            return self.memoized[key]
         except KeyError:
-            logging.debug("Memoize %s %s", self.function, args)
-            self.memoized[args] = self.function(*args)
-            return self.memoized[args]
+            logging.debug("Memoize %s %s %s", self.function, args, kwargs)
+            self.memoized[key] = self.function(*args, **kwargs)
+            return self.memoized[key]
 
 
 @Memoized
-def parse_git_log(repo, branch, old_sha, new_sha):
+def parse_git_log(repo, branch, old_sha, new_sha, this_branch_only=True):
     '''
     Parse 'git log' output. Return an array of dictionaries:
         {
@@ -116,32 +118,36 @@ def parse_git_log(repo, branch, old_sha, new_sha):
             'message': commit message
         }
     for each commit.
+
+    When this_branch_only is False, do not include commits that
+    exist in repo in 'git log' output.
     '''
     git_commit_fields = ['commit', 'author_name', 'author_email', 'date', 'message']
     git_log_format = '%x1f'.join(['%H', '%an', '%ae', '%ad', '%s']) + '%x1e'
 
-    # Get all commits that exist only on the branch
-    # being updated, and not any others
-    # See http://stackoverflow.com/questions/5720343/
-
-    # Get all refs in the repo
-    _, refs, _ = run(['git', 'for-each-ref', '--format=%(refname)'], repo)
-    refs = refs.splitlines()
-    # Remove the branch being pushed
-    if branch in refs:
-        refs.remove(branch)
-
-    cmd = ['git', 'log', '--ignore-missing', '--format=' + git_log_format]
+    cmd = ['git', 'log', '--format=' + git_log_format]
     if old_sha == '0' * 40:
         # It's a new branch
         cmd += [new_sha]
+        this_branch_only = False
     else:
         # It's an old branch, look only in this range
         cmd += ["%s..%s" % (old_sha, new_sha)]
 
+    # Get all commits that exist only on the branch
+    # being updated, and not any others
+    # See http://stackoverflow.com/questions/5720343/
     # Exclude commits that exist in the repo
-    if refs:
-        cmd += ['--not'] + refs
+    if not this_branch_only:
+        # Get all refs in the repo
+        _, refs, _ = run(['git', 'for-each-ref', '--format=%(refname)'], repo)
+        refs = refs.splitlines()
+        # Remove the branch being pushed
+        if branch in refs:
+            refs.remove(branch)
+
+        if refs:
+            cmd += ['--ignore-missing', '--not'] + refs
 
     _, log, _ = run(cmd, repo)
 
