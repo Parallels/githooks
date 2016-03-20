@@ -39,7 +39,7 @@ class Githooks(object):
         self.configure_defaults()
 
         # Set up logging
-        logging.basicConfig(format='%(asctime)s %(levelname)s [%(filename)s:%(lineno)d] %(message)s',
+        logging.basicConfig(format='%(asctime)s %(levelname)s [%(filename)s:%(lineno)d %(process)d] %(message)s',
                             level=logging.DEBUG,
                             filename=self.params['log_file'])
 
