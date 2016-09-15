@@ -100,7 +100,7 @@ class Githooks(object):
         # Caught at LESSOPEN=|/usr/bin/lesspipe.sh %s in os.environ
         # ini = ConfigParser.SafeConfigParser(os.environ)
         env = dict([(k, os.environ[k]) for k in os.environ
-                    if k.startswith('STASH_') or k.startswith('BITBUCKET_') or k == 'USER'])
+                    if k.startswith('STASH_') or k.startswith('BITBUCKET_') or k == 'USER' or k.startswith('PULL_REQUEST_')])
         ini = ConfigParser.SafeConfigParser(env)
 
         ini_path = os.path.join(ini_dir, ini_file)
@@ -129,7 +129,8 @@ class Githooks(object):
             try:
                 hook_params.update(dict(ini.items(hook)))
                 logging.debug("Updated %s settings", hook)
-            except ConfigParser.Error:
+            except ConfigParser.Error as err:
+                logging.error(str(err))
                 pass
 
             # Load the hooks from hooks_dir
