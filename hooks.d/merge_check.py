@@ -26,6 +26,17 @@ from textwrap import wrap
 import hookutil
 
 
+class TokenAuth(requests.auth.AuthBase):
+    def __init__(self, auth_user, auth_token):
+        self.auth_user = auth_user
+        self.auth_token = auth_token
+
+    def __call__(self, r):
+        r.headers['X-Auth-User'] = self.auth_user
+        r.headers['X-Auth-Token'] = self.auth_token
+        return r
+
+
 class Hook(object):
 
     def __init__(self, repo_dir, settings, params):
@@ -44,17 +55,32 @@ class Hook(object):
             repo_name = self.params['repo_name']
             pull_id = self.params['pull_id']
             pusher = self.params['pusher']
-            user_name = self.params['user_name']
-            user_passwd = self.params['user_passwd']
         except KeyError as err:
             logging.error("%s not in hook settings", err)
             raise RuntimeError("%s not in hook settings, check githooks configuration" % err)
+
+        auth = None
+        try:
+            auth_user = self.params['auth_user']
+            try:
+                auth = TokenAuth(auth_user, self.params['auth_token'])
+            except Exception:
+                logging.warning("Could not read auth token, trying basic auth")
+                try:
+                    auth = requests.auth.HTTPBasicAuth(auth_user, self.params['auth_password'])
+                except Exception:
+                    logging.error("Could not read token and password for user %s", auth_user)
+                    logging.warning("Continue with no auth")
+        except Exception:
+            logging.error("Could not read auth_user")
+            logging.warning("Continue with no auth")
+
 
         permit = False
 
         # Fetch pull request reviewers
         try:
-            pr = requests.get("%s/rest/api/1.0/projects/%s/repos/%s/pull-requests/%s" % (base_url, proj_key, repo_name, pull_id), auth=(user_name, user_passwd))
+            pr = requests.get("%s/rest/api/1.0/projects/%s/repos/%s/pull-requests/%s" % (base_url, proj_key, repo_name, pull_id), auth=auth)
             pr.raise_for_status()
         except Exception as err:
             err_msg = "Failed to fetch pull request data (%s)" % str(err)
@@ -101,7 +127,7 @@ class Hook(object):
                     # Do not fail if a mail group found in the owners list;
                     # Those mail groups are valid for the change notification hook
                     try:
-                        ru = requests.get("%s/rest/api/1.0/users/%s" % (base_url, owner.split('@')[0]), auth=(user_name, user_passwd))
+                        ru = requests.get("%s/rest/api/1.0/users/%s" % (base_url, owner.split('@')[0]), auth=auth)
                         ru.raise_for_status()
                     except Exception as err:
                         logging.error("Failed to fetch user %s data (%s)" % (owner, str(err)))
