@@ -19,5 +19,7 @@
     "deny_non_ff": [
         "refs/heads/master",
         "refs/heads/release/.*"
-    ]
+    ],
+
+    "pycheck": []
 }
