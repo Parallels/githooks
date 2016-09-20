@@ -34,6 +34,7 @@ mkdir -p $hooks_dir
 # Deploy githooks.
 cp githooks.py $root_dir
 cp hooks.d/*.py $hooks_dir
+cp -r hooks.d/pycheck $hooks_dir
 chmod +x $root_dir/githooks.py
 chmod +x $hooks_dir/*.py
 
