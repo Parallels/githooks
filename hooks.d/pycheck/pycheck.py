@@ -82,12 +82,10 @@ class Hook(object):
             selected_lines = pycodestyle.parse_udiff(diff, patterns=['*.py'], parent='')
 
             pep8style = pycodestyle.StyleGuide(
-                {
-                    'diff'          : True,
-                    'paths'         : sorted(selected_lines),
-                    'selected_lines': selected_lines,
-                    'reporter'      : pycodestyle.DiffReport
-                }
+                diff           = True,
+                paths          = sorted(selected_lines),
+                selected_lines = selected_lines,
+                reporter       = pycodestyle.DiffReport
             )
 
             report = pep8style.check_files()
