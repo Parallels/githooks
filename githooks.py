@@ -161,7 +161,7 @@ class Githooks(object):
                 status, messages = hook.check(branch, old_sha, new_sha)
 
                 for message in messages:
-                    print "[%s @ %s]: %s" % (branch, message['at'], message['text'])
+                    print "[%s @ %s]: %s" % (branch, message['at'][:7], message['text'])
 
                 permit = permit and status
 

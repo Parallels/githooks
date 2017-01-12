@@ -151,7 +151,7 @@ and deny creating branches on top level to prevent pollution.
 ]
 ```
 
-* __line_endings__ (deny commiting files that contain both CRLF and
+* __line_endings__ (deny committing files that contain both CRLF and
 LF line endings)
 
 Implements checking if any of the modified files contains both CRLF
@@ -176,6 +176,20 @@ Settings format: list of branch regexps
     ...
 ]
 ```
+
+* __copyright__ (check copyright string)
+
+Checks if at least one of copyright strings is present is each text file.
+
+Settings format: list of acceptable copyright strings
+```
+[
+    "Copyright 2017 Roga I Kotypa International",
+    "Copyright %Y",
+    ...
+]
+```
+A string formatter for the current year (%Y) might be used.
 
 ### Post-receive
 
