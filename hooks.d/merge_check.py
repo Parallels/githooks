@@ -54,7 +54,7 @@ class Hook(object):
             proj_key = self.params['proj_key']
             repo_name = self.params['repo_name']
             pull_id = self.params['pull_id']
-            pusher = self.params['pusher']
+            pull_request_author_email = self.params['pull_request_author_email']
         except KeyError as err:
             logging.error("%s not in hook settings", err)
             raise RuntimeError("%s not in hook settings, check githooks configuration" % err)
@@ -119,7 +119,7 @@ class Hook(object):
                 for owner in owners_attr.split(','):
                     # Skip this path as it is owned by the guy who merges the pull request
                     # Go to next modfile processing
-                    if pusher == owner:
+                    if pull_request_author_email == owner:
                         break
 
                     # Avoid mail groups here -- check if Bitbucket user exists
