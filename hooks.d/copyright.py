@@ -24,7 +24,7 @@ class Hook(object):
     def __init__(self, repo_dir, settings, params):
         self.repo_dir = repo_dir
         # Replace '%Y' in copyright string with current year
-        self.settings = [copyright_str.replace('%Y', str(datetime.date.today().year)) for copyright_str in settings]
+        self.settings = [(copyright['start'].replace('%Y', str(datetime.date.today().year)), copyright['full'].replace('%Y', str(datetime.date.today().year))) for copyright in settings]
         self.params = params
 
     def check(self, branch, old_sha, new_sha):
@@ -55,10 +55,11 @@ class Hook(object):
                 '''
                 Check if file contains good copyright string
                 '''
-                for copyright_str in copyrights:
-                    if re.search(copyright_str, file_contents):
-                        return True
-                return False
+                for (start, full) in copyrights:
+                    if re.search(start, file_contents):
+                        if not re.search(full, file_contents):
+                            return False
+                return True
 
             for modfile in modfiles:
                 # Skip deleted files
@@ -78,7 +79,7 @@ class Hook(object):
                 permit = permit and permit_file
 
         if not permit:
-            text = 'Please update the copyright strings to match one of the following:\n\n\t- ' + '\n\t- '.join(self.settings)
+            text = 'Please update the copyright strings to match one of the following:\n\n\t- ' + '\n\t- '.join([full for (start, full) in self.settings])
             messages.append({'at': new_sha, 'text': text + '\n'})
 
         logging.debug("Permit: %s", permit)

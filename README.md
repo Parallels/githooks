@@ -179,13 +179,19 @@ Settings format: list of branch regexps
 
 * __copyright__ (check copyright string)
 
-Checks if at least one of copyright strings is present is each text file.
+Checks if file copyright matches at least one of the configured
+copyright strings.
 
-Settings format: list of acceptable copyright strings
+Settings format: list of dicts. `start` is a pythonic regexp to check
+is the copyright is present in the file. `full` is a full copyright
+string to look for in case the copyright presence is detected by the
+above check. It can have the currenct year modifier %Y.
 ```
 [
-    "Copyright 2017 Roga I Kotypa International",
-    "Copyright %Y",
+    {
+        "start": "Copyright ",
+        "full" : "Copyright %Y Roga I Kopyta International"
+    },
     ...
 ]
 ```
