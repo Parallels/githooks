@@ -40,9 +40,6 @@ chmod +x $hooks_dir/*.py
 
 # Create githooks.ini
 cat >$root_dir/githooks.ini <<EOL
-[restrict_branches]
-user_name = %(USER)s
-
 [notify]
 user_name = %(USER)s
 base_url = http://STASH

@@ -72,12 +72,12 @@ Note: `githooks.py` configuration file must be a valid JSON.
 }
 ```
 
-A configuration file for running __restrict_branches__ and
+A configuration file for running __py_indent__ and
 __line_endings__ plugins with default settings would be:
 
 ```
 {
-    "restrict_branches": [],
+    "py_indent": [],
     "line_endings": []
 }
 ```
@@ -89,67 +89,6 @@ Githooks plugins reside in hooks.d.
 Note: plugin settings must be a valid JSON.
 
 ### Pre-receive
-
-* __restrict_branches__ (restrict commits to specific branches)
-
-Settings format: JSON, list of rules
-
-```
-[
-    {
-        "policy": "allow"/"deny",
-        "type": "create"/"update",
-        "branch": "<branch regex>",
-        "pusher": "<pusher regex>"
-    },
-    ...
-]
-```
-
-The rules are applied from top to bottom. The default is to deny
-everything, so any action is rescticted when restrict_branches runs
-with [] setting.
-
-There are two ways to configure restrict_branches:
-  1. Whitelist: add "allow" rules for opening specific locations
-  2. Blacklist: On top, add a wildcard "allow" rule that matches
-everything and then add "deny" rules for restricting specific
-locations.
-
-Example. You have product release branches (release/*), that only
-product owners or build engineers should be able to create.
-Developers are not allowed to create release/* branches. Also, you
-want to restrict development to specific paths feature/* and bugfix/*
-and deny creating branches on top level to prevent pollution.
-
-```
-[
-    {
-        "policy": "allow",
-        "type"  : "create",
-        "branch": "refs/heads/release/.*",
-        "pusher": "^(<list of allowed usernames divided by |>)$"
-    },
-    {
-        "policy": "allow",
-        "type"  : "create",
-        "branch": "(refs/heads/feature/.*|refs/heads/bugfix.*)",
-        "pusher": ".*"
-    },
-    {
-        "policy": "allow",
-        "type"  : "create",
-        "branch": "refs/tags/.*",
-        "pusher": ".*"
-    },
-    {
-        "policy": "allow",
-        "type"  : "update",
-        "branch": ".*"
-        "pusher": ".*"
-    }
-]
-```
 
 * __line_endings__ (deny committing files that contain both CRLF and
 LF line endings)
