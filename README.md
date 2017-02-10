@@ -105,17 +105,6 @@ mixed indentation (both tabs and spaces).
 
 Settings format: None, always runs with an empty list []
 
-* __deny_non_ff__ (deny non-fast-forward pushes to specific branches)
-
-Settings format: list of branch regexps
-```
-[
-    "refs/heads/master",
-    "refs/heads/release/.*",
-    ...
-]
-```
-
 * __copyright__ (check copyright string)
 
 Checks if file copyright matches at least one of the configured
