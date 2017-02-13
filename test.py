@@ -96,7 +96,6 @@ class TestBase(unittest.TestCase):
         # Create tmp/test.conf
         with open(os.path.join(self.base, 'test.conf'), 'w') as f:
             f.write(json.dumps({"line_endings":[],
-                                "py_indent":[],
                                 "notify":[],
                                 "email_mention":[]},
                                 indent=4))
@@ -258,49 +257,6 @@ class TestLineEndings(TestBase):
         self.assertTrue([message['text'] for message in messages] == [
             "Error: file 'c.txt' has mixed line endings (CRLF/LF)",
             "Error: file 'b.txt' has mixed line endings (CRLF/LF)"
-        ])
-
-        self.write_response(0, 'success')
-        git_async_result(git_call)
-
-
-class TestPyIndent(TestBase):
-
-    def test_successful_hook(self):
-        write_string('a.py', 'def main():\n  print\n  return 0\n')
-        write_string('b.txt', 'data')
-
-        git(['add', 'a.py', 'b.txt'])
-        git(['commit', '-m', 'initial commit'])
-
-        git_call = git_async(['push', '-u', 'origin', 'master'], self.repo)
-        request = self.get_request()
-
-        hook = self.hooks["py_indent"]
-        self.assertTrue(hook.check(request[0], request[1], request[2])[0])
-
-        self.write_response(0, 'success')
-        git_async_result(git_call)
-
-    def test_failed_hook(self):
-        write_string('a.py', 'def main():\n  print\n\treturn 0\n')
-        write_string('b.py', 'def main():\n  print\n\treturn 0\n')
-        write_string('a.txt', 'def main():\n  print\n\treturn 0\n')
-        git(['add', 'a.py'])
-        git(['commit', '-m', 'initial commit'])
-        git(['add', 'b.py', 'a.txt'])
-        git(['commit', '-m', 'second commit'])
-
-        git_call = git_async(['push', '-u', 'origin', 'master'], self.repo)
-        request = self.get_request()
-
-        hook = self.hooks["py_indent"]
-        permit, messages = hook.check(request[0], request[1], request[2])
-        self.assertFalse(permit)
-        self.assertTrue(len(messages) == 2)
-        self.assertTrue([message['text'] for message in messages] == [
-            "Error: file 'b.py' has mixed indentation",
-            "Error: file 'a.py' has mixed indentation"
         ])
 
         self.write_response(0, 'success')

@@ -72,12 +72,12 @@ Note: `githooks.py` configuration file must be a valid JSON.
 }
 ```
 
-A configuration file for running __py_indent__ and
+A configuration file for running __pep8hook__ and
 __line_endings__ plugins with default settings would be:
 
 ```
 {
-    "py_indent": [],
+    "pep8hook": [],
     "line_endings": []
 }
 ```
@@ -98,10 +98,9 @@ and LF line endings.
 
 Settings format: None, always runs with an empty list []
 
-* __py_indent__ (basic indentation check in python scripts)
+* __pep8hook__ (code style check in python scripts)
 
-Implements checking if any of the modified python scripts contains
-mixed indentation (both tabs and spaces).
+Runs pycodestyle on changes in python scripts.
 
 Settings format: None, always runs with an empty list []
 
