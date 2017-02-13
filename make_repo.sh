@@ -34,7 +34,6 @@ mkdir -p $hooks_dir
 # Deploy githooks.
 cp githooks.py $root_dir
 cp hooks.d/*.py $hooks_dir
-cp -r hooks.d/pycheck $hooks_dir
 chmod +x $root_dir/githooks.py
 chmod +x $hooks_dir/*.py
 
@@ -61,6 +60,11 @@ smtp_port = 25
 smtp_from =
 
 email_domain = gmail.com
+
+[pycodestyle]
+select =
+ignore = E226,E24
+max_line_length = 79
 EOL
 
 # Copy hook configuration files.

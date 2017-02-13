@@ -60,6 +60,8 @@ class Githooks(object):
         try:
             defaults = dict(self.ini.items('DEFAULT'))
 
+            defaults['ini_file'] = self.ini_file
+
             if not 'log_file' in defaults:
                 defaults['log_file'] = os.path.join(root_dir, 'githooks.log')
             if not 'conf_dir' in defaults:
@@ -107,6 +109,7 @@ class Githooks(object):
         try:
             with open(ini_path) as f:
                 ini.readfp(f)
+            self.ini_file = ini_path
         except IOError as err:
             raise RuntimeError(str(err))
 
