@@ -228,6 +228,11 @@ conf_dir = %(CONFDIR)s
 hooks_dir = %(HOOKSDIR)s
 ```
 
+* Install dependencies:
+```
+$ pip install -r requirements.txt
+```
+
 * Go to repository Settings -> (Workflow) Hooks. Enable and configure
 External Pre Receive and Post Receive Hooks. Set __Executable__ to
 `githooks.py` and check 'Look for hooks only in safe dir'. Put the path
