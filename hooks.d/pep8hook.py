@@ -19,7 +19,14 @@ import shutil
 import logging
 import hookutil
 
-import pycodestyle
+pycodestyle_available = False
+try:
+    import pycodestyle
+    pycodestyle_available = True
+except ImportError as err:
+    print "Failed to import pycodesyle. Please contact your system administrator. Skipping python style check ..."
+    logging.error("%s! %s", err, "Please make sure pycodestyle is installed on the system.")
+
 
 class Hook(object):
     def __init__(self, repo_dir, settings, params):
@@ -29,6 +36,10 @@ class Hook(object):
 
 
     def check(self, branch, old_sha, new_sha):
+        # Return early if pycodestyle is not available
+        if not pycodestyle_available:
+            return True, []
+
         logging.debug("Run: branch=%s, old_sha=%s, new_sha=%s",
                       branch, old_sha, new_sha)
         logging.debug("params=%s", self.params)
