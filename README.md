@@ -63,7 +63,11 @@ to run them from a configuration file that must be passed to
 Configuration file format: dict of plugin basenames without extension
 as keys and plugin settings as values (see [Implemented Githooks Plugins](#implemented-githooks-plugins)).
 
-Note: `githooks.py` configuration file must be a valid JSON.
+Note: `githooks.py` configuration file must be a valid YAML/JSON.
+
+Note: githooks now uses pyyaml to parse configuration files. Therefore,
+both YAML and JSON configuration files are accepted. See samples for YAML
+configuration examples (pre-receive.conf.sample and post-receive.conf-sample).
 
 ```
 {

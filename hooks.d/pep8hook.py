@@ -44,12 +44,6 @@ class Hook(object):
                       branch, old_sha, new_sha)
         logging.debug("params=%s", self.params)
 
-        try:
-            ini_file = self.params['ini_file']
-        except KeyError as err:
-            logging.error("%s not in hook settings", err)
-            raise RuntimeError("%s not in hook settings, check githooks configuration" % err)
-
         # Do not run the hook if the branch is being deleted
         if new_sha == '0' * 40:
             logging.debug("Deleting the branch, skip the hook")
@@ -99,16 +93,17 @@ class Hook(object):
             # Run pycodestyle in the working directory we have just prepared.
             selected_lines = pycodestyle.parse_udiff(diff, patterns=['*.py'], parent='')
 
-            pep8style = pycodestyle.StyleGuide(
-                diff           = True,
-                paths          = sorted(selected_lines),
-                selected_lines = selected_lines,
-                reporter       = pycodestyle.DiffReport,
-                # Use githooks.ini as config file for pycodestyle
-                # githooks.ini should have [pycodestyle] section;
-                # Otherwise, default pycodestyle configuration applies
-                config_file    = self.params['ini_file']
-            )
+            kwargs = {
+                "diff"           : True,
+                "paths"          : sorted(selected_lines),
+                "selected_lines" : selected_lines,
+                "reporter"       : pycodestyle.DiffReport
+            }
+
+            kwargs.update(self.settings)
+            logging.debug("pycodestyle.StyleGuide(%s)", kwargs)
+
+            pep8style = pycodestyle.StyleGuide(**kwargs)
 
             report = pep8style.check_files()
             os.chdir(local_dir)

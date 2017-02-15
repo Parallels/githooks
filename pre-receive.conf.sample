@@ -1,5 +1,25 @@
-{
-    "line_endings": [],
+#
+# Sample pre-receive hook configuration
+#
 
-    "pep8hook": []
-}
+line_endings: # No hook-specific settings
+
+pep8hook:
+    max_line_length: 7
+    # Note: 'ignore' and 'select' must be lists or None
+    select:
+    ignore:
+        - E203
+        - E501
+
+copyright:
+    # A list of possible copyright patterns
+    # 'start' is a pattern for checking copyright presense
+    # 'full' is a full copyright pattern with custom formatters
+    # Note: formatters are implemented by the copyright hook
+    # Year formatter (%Y) is the only formatter supported so far
+    - start: "Copyright: Copyright "
+      full : "Copyright: Copyright .*-%Y. Parallels International GmbH. All Rights Reserved."
+
+    #- start: 'Copyright: '
+    #  full : 'Copyright: Whatever'

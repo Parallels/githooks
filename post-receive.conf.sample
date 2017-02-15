@@ -1,8 +1,10 @@
-{
-    "notify": [
-        "refs/heads/master",
-        "refs/heads/release/.*"
-    ],
+#
+# Sample post-receive hook configuration
+#
 
-    "email_mention": []
-}
+email_mention: # No hook-specific settings
+
+notify:
+    # Notify owners when their files changes on these branches
+    - refs/heads/master
+    - refs/heads/release/.*

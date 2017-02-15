@@ -60,11 +60,6 @@ smtp_port = 25
 smtp_from =
 
 email_domain = gmail.com
-
-[pycodestyle]
-select =
-ignore = E226,E24
-max_line_length = 79
 EOL
 
 # Copy hook configuration files.

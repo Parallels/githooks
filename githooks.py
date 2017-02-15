@@ -22,7 +22,7 @@ https://github.com/ngsru/atlassian-external-hooks/wiki/Configuration
 
 import os
 import sys
-import json
+import yaml
 import ConfigParser
 import fileinput
 import logging
@@ -60,8 +60,6 @@ class Githooks(object):
         try:
             defaults = dict(self.ini.items('DEFAULT'))
 
-            defaults['ini_file'] = self.ini_file
-
             if not 'log_file' in defaults:
                 defaults['log_file'] = os.path.join(root_dir, 'githooks.log')
             if not 'conf_dir' in defaults:
@@ -84,7 +82,7 @@ class Githooks(object):
         conf_path = os.path.join(conf_dir, conf_file)
         try:
             with open(conf_path) as f:
-                conf = json.loads(f.read())
+                conf = yaml.load(f.read())
             logging.debug("Loaded: '%s'", conf_path)
         except IOError as err:
             logging.error(str(err))
@@ -109,7 +107,6 @@ class Githooks(object):
         try:
             with open(ini_path) as f:
                 ini.readfp(f)
-            self.ini_file = ini_path
         except IOError as err:
             raise RuntimeError(str(err))
 
