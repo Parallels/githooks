@@ -24,7 +24,7 @@ try:
     import pycodestyle
     pycodestyle_available = True
 except ImportError as err:
-    print "Failed to import pycodesyle. Please contact your system administrator. Skipping python style check ..."
+    print "Failed to import pycodestyle. Please contact your system administrator. Skipping python style check ..."
     logging.error("%s! %s", err, "Please make sure pycodestyle is installed on the system.")
 
 
