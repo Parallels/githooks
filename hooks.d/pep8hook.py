@@ -58,9 +58,9 @@ class Hook(object):
             # Filter python scripts from the files modified in new_sha
             modfiles = hookutil.parse_git_show(self.repo_dir, commit['commit'], ['.py'])
 
-            # Exit early if there are no modified python scripts in the changeset
+            # Next iteration if there are no modified python scripts in the changeset
             if not modfiles:
-                return permit
+                continue
 
             # Set up a working directory for pycodestyle and fill it with the blobs to be checked
             pep8_workdir = tempfile.mkdtemp(suffix='pep8')

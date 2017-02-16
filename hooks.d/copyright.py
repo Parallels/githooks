@@ -33,7 +33,7 @@ class Hook(object):
         logging.debug("params=%s", self.params)
 
         if not self.settings:
-            return True
+            return True, []
 
         permit = True
 
