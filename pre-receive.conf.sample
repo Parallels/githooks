@@ -23,3 +23,5 @@ copyright:
 
     #- start: 'Copyright: '
     #  full : 'Copyright: Whatever'
+
+rejectmerge:
