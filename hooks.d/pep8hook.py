@@ -85,7 +85,7 @@ class Hook(object):
                     fd.write(file_contents)
 
             # Get the commit's diff; pycodestyle needs it to report only against modified lines
-            cmd = ['git', 'show', commit['commit']]
+            cmd = ['git', 'show', '-U0', commit['commit']]
             _, diff, _ = hookutil.run(cmd, self.repo_dir)
 
             local_dir = os.curdir
