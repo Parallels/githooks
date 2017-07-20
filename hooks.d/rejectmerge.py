@@ -72,13 +72,20 @@ class Hook(object):
             parentBranches = []
             for parentCommit in parentCommits:
                 cmd = ['git', 'branch', '--contains', parentCommit]
-                _, out, _ = hookutil.run(cmd, self.repo_dir)
+                ret, out, err = hookutil.run(cmd, self.repo_dir)
+                # FIXME Skip if parent commit was not found on any branch
+                if not out and not err and not ret:
+                    # These are stdout, stderr and return code that Popen.wait produces for 'git branch --continue'
+                    # with shell=False. When a commit does not exist in the remote, the command should return 129
+                    # and an error meesage in stderr. With shell=True, it does not work as extected either (returns 1
+                    # and git usage in stdout, similar to running just 'git' instead of 'git branch --continue ...').
+                    continue
                 if not out:
                     parentBranches.append(branch.replace('refs/heads/', ''))
                 else:
                     parentBranches += [br.replace("* ", "") for br in out.strip().split('\n')]
 
-            if len(set(parentBranches)) > 1:
+            if len(set(parentBranches)) != 1:
                 continue
 
             mergedBranch = parentBranches[0]
