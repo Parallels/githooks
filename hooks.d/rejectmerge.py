@@ -53,7 +53,7 @@ class Hook(object):
 
         permit = True
 
-        log = hookutil.parse_git_log(self.repo_dir, branch, old_sha, new_sha)
+        log = hookutil.parse_git_log(self.repo_dir, branch, old_sha, new_sha, this_branch_only=False)
 
         messages = []
         for commit in log:
