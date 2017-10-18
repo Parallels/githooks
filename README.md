@@ -255,7 +255,7 @@ Run the unittests:
 $ python -m unittest test
 ```
 
-To deploy an emprt repository with githooks installed (in $PWD/tmp):
+To deploy an empty repository with githooks installed (in $PWD/tmp):
 
 ```
 $ source make_repo.sh
